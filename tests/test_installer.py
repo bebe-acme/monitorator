@@ -26,7 +26,7 @@ class TestHookInstaller:
             "permissions": {"allow": ["Bash"]},
             "hooks": {
                 "PreToolUse": [
-                    {"matcher": {}, "hooks": [{"type": "command", "command": "existing-hook"}]},
+                    {"matcher": "", "hooks": [{"type": "command", "command": "existing-hook"}]},
                 ],
             },
         }))
@@ -76,7 +76,7 @@ class TestHookInstaller:
         tmp_settings_file.write_text(json.dumps({
             "hooks": {
                 "PreToolUse": [
-                    {"matcher": {}, "hooks": [{"type": "command", "command": "other-tool"}]},
+                    {"matcher": "", "hooks": [{"type": "command", "command": "other-tool"}]},
                 ],
             },
         }))
@@ -123,6 +123,7 @@ class TestHookInstaller:
             assert isinstance(entries, list), f"{event}: not a list"
             for entry in entries:
                 assert "matcher" in entry, f"{event}: missing matcher field"
+                assert isinstance(entry["matcher"], str), f"{event}: matcher must be a string, not {type(entry['matcher'])}"
                 assert "hooks" in entry, f"{event}: missing hooks field"
                 assert isinstance(entry["hooks"], list), f"{event}: hooks not a list"
                 for hook in entry["hooks"]:
@@ -135,7 +136,7 @@ class TestHookInstaller:
             "hooks": {
                 "PreToolUse": [
                     {
-                        "matcher": {"tools": ["BashTool"]},
+                        "matcher": "Bash",
                         "hooks": [{"type": "command", "command": "echo done"}],
                     }
                 ],
@@ -148,7 +149,7 @@ class TestHookInstaller:
         # Should have the existing matcher hook + our new one
         assert len(pre_hooks) == 2
         # Existing one preserved
-        assert pre_hooks[0]["matcher"] == {"tools": ["BashTool"]}
+        assert pre_hooks[0]["matcher"] == "Bash"
         assert pre_hooks[0]["hooks"][0]["command"] == "echo done"
         # Ours added
         assert any(

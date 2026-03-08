@@ -40,7 +40,7 @@ class HookInstaller:
     def _make_hook_entry(self) -> dict[str, object]:
         """Create a matcher-based hook entry (new Claude Code format)."""
         return {
-            "matcher": {},
+            "matcher": "",
             "hooks": [{"type": "command", "command": self._hook_command}],
         }
 
