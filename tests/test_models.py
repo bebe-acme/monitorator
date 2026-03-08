@@ -221,3 +221,77 @@ class TestMergedSession:
             is_stale=True,
         )
         assert merged.project_name == "unknown"
+
+
+class TestMergedSessionLastInteractionTime:
+    def test_uses_hook_updated_at(self) -> None:
+        state = SessionState(session_id="t1", cwd="/tmp", updated_at=5000.0)
+        merged = MergedSession(
+            session_id="t1",
+            hook_state=state,
+            process_info=None,
+            effective_status=SessionStatus.IDLE,
+            is_stale=False,
+        )
+        assert merged.last_interaction_time == 5000.0
+
+    def test_falls_back_to_hook_timestamp(self) -> None:
+        state = SessionState(session_id="t2", cwd="/tmp", timestamp=3000.0)
+        merged = MergedSession(
+            session_id="t2",
+            hook_state=state,
+            process_info=None,
+            effective_status=SessionStatus.IDLE,
+            is_stale=False,
+        )
+        assert merged.last_interaction_time == 3000.0
+
+    def test_hookless_uses_process_elapsed(self) -> None:
+        proc = ProcessInfo(pid=1, cpu_percent=0.0, elapsed_seconds=600, cwd="/tmp", command="claude")
+        merged = MergedSession(
+            session_id="t3",
+            hook_state=None,
+            process_info=proc,
+            effective_status=SessionStatus.IDLE,
+            is_stale=False,
+        )
+        # Should be approximately now - 600
+        now = time.time()
+        assert abs(merged.last_interaction_time - (now - 600)) < 2.0
+
+    def test_no_data_returns_zero(self) -> None:
+        merged = MergedSession(
+            session_id="t4",
+            hook_state=None,
+            process_info=None,
+            effective_status=SessionStatus.UNKNOWN,
+            is_stale=True,
+        )
+        assert merged.last_interaction_time == 0.0
+
+    def test_sort_by_last_interaction_time(self) -> None:
+        """Sessions sorted by last_interaction_time descending = most recent first."""
+        old = MergedSession(
+            session_id="old",
+            hook_state=SessionState(session_id="old", cwd="/tmp", updated_at=1000.0),
+            process_info=None,
+            effective_status=SessionStatus.IDLE,
+            is_stale=False,
+        )
+        new = MergedSession(
+            session_id="new",
+            hook_state=SessionState(session_id="new", cwd="/tmp", updated_at=5000.0),
+            process_info=None,
+            effective_status=SessionStatus.THINKING,
+            is_stale=False,
+        )
+        mid = MergedSession(
+            session_id="mid",
+            hook_state=SessionState(session_id="mid", cwd="/tmp", updated_at=3000.0),
+            process_info=None,
+            effective_status=SessionStatus.IDLE,
+            is_stale=False,
+        )
+        sessions = [old, mid, new]
+        sessions.sort(key=lambda m: m.last_interaction_time, reverse=True)
+        assert [s.session_id for s in sessions] == ["new", "mid", "old"]

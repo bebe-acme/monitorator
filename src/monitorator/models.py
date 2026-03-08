@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -90,6 +91,18 @@ class MergedSession:
     process_info: Optional[ProcessInfo]
     effective_status: SessionStatus
     is_stale: bool
+
+    @property
+    def last_interaction_time(self) -> float:
+        """Unix timestamp of last interaction. Higher = more recent."""
+        if self.hook_state:
+            if self.hook_state.updated_at:
+                return self.hook_state.updated_at
+            if self.hook_state.timestamp:
+                return self.hook_state.timestamp
+        if self.process_info:
+            return time.time() - self.process_info.elapsed_seconds
+        return 0.0
 
     @property
     def project_name(self) -> str:

@@ -61,6 +61,7 @@ class MonitoratorApp(App[None]):
         self._store.cleanup_stale(active_cwds=active_cwds)
         hook_states = self._store.list_all()
         merged = [m for m in self._merger.merge(hook_states, processes) if not m.is_stale]
+        merged.sort(key=lambda m: m.last_interaction_time, reverse=True)
 
         current = {m.session_id: m for m in merged}
         self._notifier.check_transitions(self._previous, current)
@@ -89,6 +90,15 @@ class MonitoratorApp(App[None]):
             row = SessionRow(current[sid])
             self._cards[sid] = row
             container.mount(row)
+
+        # Reorder rows to match sorted order (most recently interacted first)
+        sorted_sids = list(current.keys())
+        for i, sid in enumerate(sorted_sids):
+            if sid in self._cards:
+                container.move_child(self._cards[sid], before=i)
+
+        # Rebuild _cards in sorted order for consistent indexing
+        self._cards = {sid: self._cards[sid] for sid in sorted_sids if sid in self._cards}
 
         # Re-index all rows
         for i, sid in enumerate(self._cards, start=1):
