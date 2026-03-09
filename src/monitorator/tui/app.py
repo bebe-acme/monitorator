@@ -86,7 +86,7 @@ class MonitoratorApp(App[None]):
         active_cwds = {p.cwd for p in processes if p.cwd}
         self._store.cleanup_stale(active_cwds=active_cwds)
         hook_states = self._store.list_all()
-        merged = [m for m in self._merger.merge(hook_states, processes) if not m.is_stale]
+        merged = self._merger.merge(hook_states, processes)
 
         # Mark sessions with dead PIDs as terminated
         for m in merged:

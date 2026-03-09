@@ -399,8 +399,8 @@ class TestSessionRowSprite:
         content1 = row._build_content()
         assert content0 == content1
 
-    def test_permission_session_has_strobe(self) -> None:
-        """PERMISSION alternates between sprite and blank."""
+    def test_permission_session_has_jump(self) -> None:
+        """PERMISSION uses jump animation (standing vs peak differ)."""
         from monitorator.tui.session_row import SessionRow
 
         session = make_merged(status=SessionStatus.WAITING_PERMISSION, prompt=None)
@@ -408,9 +408,9 @@ class TestSessionRowSprite:
         row.update_index(1)
         row._anim_frame = 0
         content0 = row._build_content()
-        row._anim_frame = 1
-        content1 = row._build_content()
-        assert content0 != content1
+        row._anim_frame = 3
+        content3 = row._build_content()
+        assert content0 != content3
 
     def test_sprite_uses_fixed_palette(self) -> None:
         """Sprite uses a fixed palette color based on session_id, not row position."""

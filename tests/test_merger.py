@@ -203,8 +203,8 @@ class TestSessionMerger:
         merged = merger.merge(states, procs)
         assert merged[0].effective_status == SessionStatus.IDLE
 
-    def test_hookless_process_stale_when_idle_long_time(self) -> None:
-        """Hookless process with 0% CPU and >1h uptime should be stale."""
+    def test_hookless_process_never_stale(self) -> None:
+        """Hookless process should never be stale — if a process is running, show it."""
         states: list[SessionState] = []
         processes = [ProcessInfo(
             pid=100, cpu_percent=0.0, elapsed_seconds=3700,  # >1h
@@ -212,7 +212,7 @@ class TestSessionMerger:
         )]
         merger = SessionMerger()
         merged = merger.merge(states, processes)
-        assert merged[0].is_stale
+        assert not merged[0].is_stale
 
     def test_hookless_process_not_stale_when_active(self) -> None:
         """Hookless process with high CPU should NOT be stale regardless of uptime."""

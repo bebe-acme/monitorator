@@ -9,8 +9,6 @@ STALE_THRESHOLD_SECONDS = 300  # 5 minutes
 CPU_OVERRIDE_THRESHOLD = 10.0  # percent — CPU must exceed this to go IDLE→THINKING
 CPU_DROP_THRESHOLD = 3.0  # percent — CPU must drop below this to go THINKING→IDLE
 STATUS_HOLD_SECONDS = 15.0  # seconds — hold active status to prevent flicker
-HOOKLESS_STALE_ELAPSED = 3600  # 1 hour — hookless process idle this long = stale
-HOOKLESS_STALE_CPU = 1.0  # percent — below this CPU, hookless process considered idle
 
 _ACTIVE_STATUSES = {SessionStatus.THINKING, SessionStatus.EXECUTING, SessionStatus.SUBAGENT_RUNNING}
 
@@ -82,10 +80,7 @@ class SessionMerger:
                 effective_status = SessionStatus.THINKING
             else:
                 effective_status = SessionStatus.IDLE
-            is_stale = (
-                proc.cpu_percent < HOOKLESS_STALE_CPU
-                and proc.elapsed_seconds > HOOKLESS_STALE_ELAPSED
-            )
+            is_stale = False  # Running process = always visible
             self._prev_status[session_id] = effective_status
             results.append(MergedSession(
                 session_id=session_id,

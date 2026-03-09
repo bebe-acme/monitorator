@@ -691,6 +691,24 @@ def _walk_frame(grid: list[list[int]], phase: int) -> list[list[int]]:
     return result
 
 
+def _jump_frame(grid: list[list[int]], offset: int) -> list[list[int]]:
+    """Shift entire grid UP by |offset| rows, fill bottom with transparent.
+
+    offset is negative (e.g. -2 = shift up 2 rows).
+    """
+    if offset >= 0:
+        return grid
+    shift = -offset
+    result: list[list[int]] = []
+    for r in range(len(grid)):
+        src = r + shift
+        if src < len(grid):
+            result.append(grid[src][:])
+        else:
+            result.append([0] * _GRID_COLS)
+    return result
+
+
 def _apply_palette_brightness(
     palette: dict[int, str], factor: float
 ) -> dict[int, str]:
@@ -717,20 +735,19 @@ _BLANK_FRAME: tuple[str, str, str, str, str] = (
     " " * _GRID_COLS,
 )
 
-# THINKING horizontal sway (8 frames):
-# base, right, right, base, base, left, left, base
-_THINKING_SWAY: list[int] = [0, 1, 1, 0, 0, -1, -1, 0]
+# THINKING walk cycle (8 frames): 4 positions cycled twice
+_THINKING_PHASES: list[int] = [0, 1, 2, 3, 0, 1, 2, 3]
 
-# EXECUTING walk cycle (8 frames): 4 positions cycled twice
-_EXECUTING_PHASES: list[int] = [0, 1, 2, 3, 0, 1, 2, 3]
+# EXECUTING fast walk cycle (8 frames): double-speed walk
+_EXECUTING_PHASES: list[int] = [0, 2, 0, 2, 1, 3, 1, 3]
 
 # SUBAGENT_RUNNING pulse brightness (8 frames):
 # base, bright, brighter, brightest, bright, base, dim, base
 _PULSE_FACTORS: list[float] = [0.0, 0.15, 0.35, 0.55, 0.35, 0.0, -0.3, 0.0]
 
-# WAITING_PERMISSION strobe pattern (8 frames):
-# sprite, blank, sprite, blank, sprite, sprite, blank, blank
-_STROBE_VISIBLE: list[bool] = [True, False, True, False, True, True, False, False]
+# WAITING_PERMISSION jump offsets (8 frames):
+# standing, standing, jump up 1, peak (up 2), peak, descending (up 1), landed, landed
+_JUMP_OFFSETS: list[int] = [0, 0, -1, -2, -2, -1, 0, 0]
 
 
 def get_sprite_frame(
@@ -766,15 +783,13 @@ def get_sprite_frame(
         lines = render_sprite(base_grid, palette)
         return tuple(f"[dim]{line}[/]" for line in lines)  # type: ignore[return-value]
 
-    # -- THINKING: horizontal sway (pondering) --
+    # -- THINKING: walk cycle --
     if status == SessionStatus.THINKING:
-        sway = _THINKING_SWAY[frame]
-        if sway == 1:
-            grid = _shift_grid_right(base_grid)
-        elif sway == -1:
-            grid = _shift_grid_left(base_grid)
-        else:
+        phase = _THINKING_PHASES[frame]
+        if phase == 0:
             grid = base_grid
+        else:
+            grid = _walk_frame(base_grid, phase)
         return render_sprite(grid, palette)
 
     # -- EXECUTING: walk cycle --
@@ -794,11 +809,13 @@ def get_sprite_frame(
         adjusted = _apply_palette_brightness(palette, factor)
         return render_sprite(base_grid, adjusted)
 
-    # -- WAITING_PERMISSION: strobe --
+    # -- WAITING_PERMISSION: jump --
     if status == SessionStatus.WAITING_PERMISSION:
-        if _STROBE_VISIBLE[frame]:
+        offset = _JUMP_OFFSETS[frame]
+        if offset == 0:
             return render_sprite(base_grid, palette)
-        return _BLANK_FRAME
+        grid = _jump_frame(base_grid, offset)
+        return render_sprite(grid, palette)
 
     # -- Fallback --
     return render_sprite(base_grid, palette)

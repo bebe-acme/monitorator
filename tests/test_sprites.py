@@ -317,31 +317,31 @@ class TestGetSpriteFrame:
         frame1 = get_sprite_frame(row_index=1, status=SessionStatus.EXECUTING, anim_frame=1)
         assert frame0 != frame1
 
-    def test_permission_strobes(self) -> None:
-        """WAITING_PERMISSION alternates between content and blank."""
+    def test_permission_jumps(self) -> None:
+        """WAITING_PERMISSION uses jump animation (frame 0 vs frame 3 differ)."""
         from monitorator.tui.sprites import get_sprite_frame
 
         frame0 = get_sprite_frame(
             row_index=1, status=SessionStatus.WAITING_PERMISSION, anim_frame=0,
         )
-        frame1 = get_sprite_frame(
-            row_index=1, status=SessionStatus.WAITING_PERMISSION, anim_frame=1,
+        frame3 = get_sprite_frame(
+            row_index=1, status=SessionStatus.WAITING_PERMISSION, anim_frame=3,
         )
-        frame0_has_content = any(line.strip() != "" for line in frame0)
-        frame1_has_content = any(line.strip() != "" for line in frame1)
-        # Frame 0 is visible, frame 1 is blank
-        assert frame0_has_content
-        assert not frame1_has_content
+        # Frame 0 is standing, frame 3 is at peak jump
+        assert frame0 != frame3
 
-    def test_permission_blank_frame_is_twelve_spaces(self) -> None:
-        """The blank frame in permission strobe should be exactly 12 spaces per line."""
+    def test_permission_jump_animates(self) -> None:
+        """Jump animation produces different frames across the cycle."""
         from monitorator.tui.sprites import get_sprite_frame
 
-        result = get_sprite_frame(
-            row_index=1, status=SessionStatus.WAITING_PERMISSION, anim_frame=1,
-        )
-        for i, line in enumerate(result):
-            assert line == " " * 12, f"Blank frame line {i}: {line!r}"
+        frames = [
+            get_sprite_frame(
+                row_index=1, status=SessionStatus.WAITING_PERMISSION, anim_frame=f,
+            )
+            for f in range(8)
+        ]
+        unique = len(set(frames))
+        assert unique >= 2, f"Expected at least 2 distinct jump frames, got {unique}"
 
     def test_terminated_has_dim(self) -> None:
         """TERMINATED output should contain 'dim' markup."""
@@ -395,8 +395,8 @@ class TestGetSpriteFrame:
         sprite_23 = get_sprite_frame(row_index=23, status=SessionStatus.IDLE, anim_frame=0)
         assert sprite_1 == sprite_23
 
-    def test_thinking_has_8_frame_sway_cycle(self) -> None:
-        """THINKING animation uses an 8-frame horizontal sway (no vertical jump)."""
+    def test_thinking_walk_cycle(self) -> None:
+        """THINKING animation uses a walk cycle (4 phases cycled twice)."""
         from monitorator.tui.sprites import get_sprite_frame
 
         frames = [
@@ -405,14 +405,14 @@ class TestGetSpriteFrame:
             )
             for f in range(8)
         ]
-        # Sway pattern: base, right, right, base, base, left, left, base
-        assert frames[0] == frames[3]  # base == base
-        assert frames[1] == frames[2]  # right == right
-        assert frames[5] == frames[6]  # left == left
-        assert frames[0] == frames[7]  # base == base
-        # At least 3 distinct frames (base, right, left)
+        # Walk pattern: 0,1,2,3,0,1,2,3 — cycles repeat
+        assert frames[0] == frames[4]  # phase 0 repeats
+        assert frames[1] == frames[5]  # phase 1 repeats
+        assert frames[2] == frames[6]  # phase 2 repeats
+        assert frames[3] == frames[7]  # phase 3 repeats
+        # At least 2 distinct frames
         unique = len(set(frames))
-        assert unique >= 3, f"Expected at least 3 distinct THINKING frames, got {unique}"
+        assert unique >= 2, f"Expected at least 2 distinct THINKING frames, got {unique}"
 
     def test_thinking_frame_0_is_base_grid(self) -> None:
         """THINKING at phase 0 should render the base (unmodified) grid, same as IDLE."""
@@ -442,19 +442,24 @@ class TestGetSpriteFrame:
                     f"Status {status.value} line {i} has {len(visible)} visible chars"
                 )
 
-    def test_permission_strobe_pattern(self) -> None:
-        """Permission strobe follows: visible, blank, visible, blank, visible, visible, blank, blank."""
+    def test_permission_jump_pattern(self) -> None:
+        """Permission jump follows offset pattern: 0,0,-1,-2,-2,-1,0,0."""
         from monitorator.tui.sprites import get_sprite_frame
 
-        expected_visible = [True, False, True, False, True, True, False, False]
-        for frame_idx, should_be_visible in enumerate(expected_visible):
-            result = get_sprite_frame(
-                row_index=1, status=SessionStatus.WAITING_PERMISSION, anim_frame=frame_idx,
+        frames = [
+            get_sprite_frame(
+                row_index=1, status=SessionStatus.WAITING_PERMISSION, anim_frame=f,
             )
-            has_content = any(line.strip() != "" for line in result)
-            assert has_content == should_be_visible, (
-                f"Frame {frame_idx}: expected visible={should_be_visible}, got {has_content}"
-            )
+            for f in range(8)
+        ]
+        # Standing frames should be equal
+        assert frames[0] == frames[1], "Frames 0 and 1 should both be standing"
+        assert frames[0] == frames[6], "Frames 0 and 6 should both be standing"
+        assert frames[0] == frames[7], "Frames 0 and 7 should both be standing"
+        # Peak frames should be equal
+        assert frames[3] == frames[4], "Frames 3 and 4 should both be at peak"
+        # Standing != peak
+        assert frames[0] != frames[3], "Standing and peak should differ"
 
     def test_subagent_pulse_pattern(self) -> None:
         """SUBAGENT_RUNNING pulse: frames 0 and 5 are base, frame 6 is dimmed."""
@@ -842,8 +847,8 @@ class TestIntegration:
                 f"Subagent frame {i} != frame {i + 8}, cycle is not 8"
             )
 
-    def test_executing_walk_has_8_frame_cycle(self) -> None:
-        """EXECUTING walk cycles through twice in 8 frames."""
+    def test_executing_fast_walk_has_8_frame_cycle(self) -> None:
+        """EXECUTING fast walk: pattern [0,2,0,2,1,3,1,3] — 2-frame repeats."""
         from monitorator.tui.sprites import get_sprite_frame
 
         frames = [
@@ -852,8 +857,8 @@ class TestIntegration:
             )
             for f in range(8)
         ]
-        # 4 positions repeated: frame 0 == frame 4, etc.
-        for i in range(4):
-            assert frames[i] == frames[i + 4], (
-                f"Walk frame {i} != frame {i + 4}"
-            )
+        # Fast walk pattern: frames 0==2, 1==3, 4==6, 5==7
+        assert frames[0] == frames[2], "Fast walk frames 0 and 2 should match"
+        assert frames[1] == frames[3], "Fast walk frames 1 and 3 should match"
+        assert frames[4] == frames[6], "Fast walk frames 4 and 6 should match"
+        assert frames[5] == frames[7], "Fast walk frames 5 and 7 should match"
