@@ -137,9 +137,10 @@ ChatDropdown {
     height: auto;
     max-height: 16;
     background: #0e0e0e;
-    border-left: wide #333300;
-    padding: 0 0;
-    margin: 0 0 0 2;
+    border: round #333300;
+    border-left: wide #ffcc00;
+    padding: 1 2;
+    margin: 0 1 1 3;
     scrollbar-size: 1 1;
     scrollbar-color: #333300;
     scrollbar-color-hover: #ffcc00;
@@ -156,7 +157,7 @@ ChatMessage {
 }
 
 ChatMessage.user-msg {
-    padding: 1 1 0 1;
+    padding: 1 1 0 2;
 }
 
 ChatMessage.turn-start {
@@ -164,11 +165,11 @@ ChatMessage.turn-start {
 }
 
 ChatMessage.assistant-msg {
-    padding: 0 1 0 1;
+    padding: 0 1 0 2;
 }
 
 ChatMessage.tool-msg {
-    padding: 0 1 0 1;
+    padding: 0 1 0 3;
 }
 
 
@@ -177,21 +178,26 @@ ChatMessage.tool-msg {
 Footer {
     background: #111111;
     color: #666666;
+    border-top: solid #1a1a1a;
+    padding: 0 2;
 }
 
 Footer > .footer--highlight {
     background: #1a1a00;
     color: #ffcc00;
+    margin: 0 1;
 }
 
 Footer > .footer--key {
     background: #1a1a00;
     color: #ffcc00;
     text-style: bold;
+    margin: 0 1;
 }
 
 Footer > .footer--highlight-key {
     background: #ffcc00;
     color: #000000;
     text-style: bold;
+    margin: 0 1;
 }
