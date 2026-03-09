@@ -173,12 +173,21 @@ class SessionRow(Static, can_focus=True):
             else "-"
         )
 
-        # Context estimate
+        # Context estimate — try process_info UUID first, fall back to hook_state session_id
         ctx = "-"
-        if show_ctx and s.process_info and s.process_info.session_uuid and s.process_info.cwd:
-            estimate = get_context_estimate(s.process_info.cwd, s.process_info.session_uuid)
-            if estimate:
-                ctx = estimate
+        if show_ctx:
+            ctx_uuid = None
+            ctx_cwd = None
+            if s.process_info and s.process_info.session_uuid and s.process_info.cwd:
+                ctx_uuid = s.process_info.session_uuid
+                ctx_cwd = s.process_info.cwd
+            elif s.hook_state and s.hook_state.session_id and s.hook_state.cwd:
+                ctx_uuid = s.hook_state.session_id
+                ctx_cwd = s.hook_state.cwd
+            if ctx_uuid and ctx_cwd:
+                estimate = get_context_estimate(ctx_cwd, ctx_uuid)
+                if estimate:
+                    ctx = estimate
 
         idx = self._row_index
         color = STATUS_COLORS.get(status, "#666666")
