@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import time
+from unittest.mock import patch, MagicMock
 
 import pytest
 
 from monitorator.models import MergedSession, ProcessInfo, SessionState, SessionStatus
-from monitorator.tui.app import MonitoratorApp
+from monitorator.tui.app import MonitoratorApp, _STALE_ACTIVE_STATUSES, STALE_HOOK_THRESHOLD
 from monitorator.tui.header_banner import HeaderBanner
 from monitorator.tui.column_header import ColumnHeader
 from monitorator.tui.session_row import SessionRow
@@ -92,6 +93,13 @@ class TestColumnHeaderWidget:
             assert ch is not None
 
 
+class TestMonitoratorAppForceRefresh:
+    def test_force_refresh_binding_exists(self) -> None:
+        app = MonitoratorApp()
+        binding_keys = [b.key for b in app.BINDINGS]
+        assert "R" in binding_keys
+
+
 class TestDetailPanelToolLabel:
     def _get_content(self, session: MergedSession) -> str:
         """Build the detail panel content string."""
@@ -140,3 +148,232 @@ class TestDetailPanelWidget:
         async with MonitoratorApp().run_test(size=(120, 30)) as pilot:
             panel = pilot.app.query_one(DetailPanel)
             panel.clear_session()
+
+
+class TestRefreshStaleOverride:
+    """Tests for the stale active session override logic in _refresh()."""
+
+    def test_refresh_does_not_call_mark_dead_pids(self) -> None:
+        """_refresh() should NOT call mark_dead_pids_terminated (only force_refresh does)."""
+        app = MonitoratorApp()
+        app._store = MagicMock()
+        app._store.list_all.return_value = []
+        app._scanner = MagicMock()
+        app._scanner.scan.return_value = []
+        app._merger = MagicMock()
+        app._merger.merge.return_value = []
+        app._notifier = MagicMock()
+        # Stub out TUI queries so _refresh doesn't fail on widget lookups
+        app.query_one = MagicMock()
+        app.query = MagicMock(return_value=[])
+
+        app._refresh()
+
+        app._store.mark_dead_pids_terminated.assert_not_called()
+
+    @patch("monitorator.tui.app.is_pid_alive", return_value=True)
+    def test_stale_active_session_with_alive_pid_becomes_idle(
+        self, mock_pid_alive: MagicMock
+    ) -> None:
+        """A THINKING session with alive PID and stale hooks (>5 min) should become IDLE."""
+        stale_time = time.time() - STALE_HOOK_THRESHOLD - 60  # 6 min ago
+        session = MergedSession(
+            session_id="stale-1",
+            hook_state=SessionState(
+                session_id="stale-1",
+                cwd="/tmp/proj",
+                status=SessionStatus.THINKING,
+                updated_at=stale_time,
+            ),
+            process_info=ProcessInfo(
+                pid=99999,
+                cpu_percent=5.0,
+                elapsed_seconds=600,
+                cwd="/tmp/proj",
+                command="claude",
+            ),
+            effective_status=SessionStatus.THINKING,
+            is_stale=False,
+        )
+
+        app = MonitoratorApp()
+        app._store = MagicMock()
+        app._store.list_all.return_value = []
+        app._scanner = MagicMock()
+        app._scanner.scan.return_value = []
+        app._merger = MagicMock()
+        app._merger.merge.return_value = [session]
+        app._notifier = MagicMock()
+        app.query_one = MagicMock()
+        app.query = MagicMock(return_value=[])
+
+        app._refresh()
+
+        assert session.effective_status == SessionStatus.IDLE
+
+    @patch("monitorator.tui.app.is_pid_alive", return_value=True)
+    def test_recent_active_session_stays_active(
+        self, mock_pid_alive: MagicMock
+    ) -> None:
+        """A THINKING session with alive PID and recent hooks (<5 min) should stay THINKING."""
+        recent_time = time.time() - 60  # 1 min ago
+        session = MergedSession(
+            session_id="recent-1",
+            hook_state=SessionState(
+                session_id="recent-1",
+                cwd="/tmp/proj",
+                status=SessionStatus.THINKING,
+                updated_at=recent_time,
+            ),
+            process_info=ProcessInfo(
+                pid=99998,
+                cpu_percent=50.0,
+                elapsed_seconds=120,
+                cwd="/tmp/proj",
+                command="claude",
+            ),
+            effective_status=SessionStatus.THINKING,
+            is_stale=False,
+        )
+
+        app = MonitoratorApp()
+        app._store = MagicMock()
+        app._store.list_all.return_value = []
+        app._scanner = MagicMock()
+        app._scanner.scan.return_value = []
+        app._merger = MagicMock()
+        app._merger.merge.return_value = [session]
+        app._notifier = MagicMock()
+        app.query_one = MagicMock()
+        app.query = MagicMock(return_value=[])
+
+        app._refresh()
+
+        assert session.effective_status == SessionStatus.THINKING
+
+    @patch("monitorator.tui.app.is_pid_alive", return_value=True)
+    def test_stale_permission_session_with_alive_pid_becomes_idle(
+        self, mock_pid_alive: MagicMock
+    ) -> None:
+        """A WAITING_PERMISSION session with alive PID and stale hooks (>5 min) should become IDLE."""
+        stale_time = time.time() - STALE_HOOK_THRESHOLD - 60  # 6 min ago
+        session = MergedSession(
+            session_id="perm-stale-1",
+            hook_state=SessionState(
+                session_id="perm-stale-1",
+                cwd="/tmp/proj",
+                status=SessionStatus.WAITING_PERMISSION,
+                updated_at=stale_time,
+            ),
+            process_info=ProcessInfo(
+                pid=99997,
+                cpu_percent=5.0,
+                elapsed_seconds=600,
+                cwd="/tmp/proj",
+                command="claude",
+            ),
+            effective_status=SessionStatus.WAITING_PERMISSION,
+            is_stale=False,
+        )
+
+        app = MonitoratorApp()
+        app._store = MagicMock()
+        app._store.list_all.return_value = []
+        app._scanner = MagicMock()
+        app._scanner.scan.return_value = []
+        app._merger = MagicMock()
+        app._merger.merge.return_value = [session]
+        app._notifier = MagicMock()
+        app.query_one = MagicMock()
+        app.query = MagicMock(return_value=[])
+        # Pre-populate _previous so auto-focus doesn't trigger for "new" permission
+        app._previous = {"perm-stale-1": session}
+
+        app._refresh()
+
+        assert session.effective_status == SessionStatus.IDLE
+
+
+class TestHelpOverlay:
+    def test_help_binding_exists(self) -> None:
+        app = MonitoratorApp()
+        keys = [b.key for b in app.BINDINGS]
+        assert "question_mark" in keys
+
+
+class TestSortToggle:
+    def test_sort_binding_exists(self) -> None:
+        app = MonitoratorApp()
+        keys = [b.key for b in app.BINDINGS]
+        assert "s" in keys
+
+    def test_sort_modes_defined(self) -> None:
+        app = MonitoratorApp()
+        assert hasattr(app, '_SORT_MODES')
+        assert len(app._SORT_MODES) >= 3
+
+    def test_cycle_sort_increments(self) -> None:
+        app = MonitoratorApp()
+        assert app._sort_mode == 0
+        with patch.object(app, "_refresh"):
+            app.action_cycle_sort()
+        assert app._sort_mode == 1
+
+    def test_cycle_sort_wraps_around(self) -> None:
+        app = MonitoratorApp()
+        with patch.object(app, "_refresh"):
+            for _ in range(len(app._SORT_MODES)):
+                app.action_cycle_sort()
+        assert app._sort_mode == 0
+
+
+class TestFilterToggle:
+    def test_filter_binding_exists(self) -> None:
+        app = MonitoratorApp()
+        keys = [b.key for b in app.BINDINGS]
+        assert "f" in keys
+
+    def test_filter_modes_defined(self) -> None:
+        app = MonitoratorApp()
+        assert hasattr(app, '_FILTER_MODES')
+        assert len(app._FILTER_MODES) >= 3
+
+    def test_cycle_filter_increments(self) -> None:
+        app = MonitoratorApp()
+        assert app._filter_mode == 0
+        with patch.object(app, "_refresh"):
+            app.action_cycle_filter()
+        assert app._filter_mode == 1
+
+    def test_cycle_filter_wraps_around(self) -> None:
+        app = MonitoratorApp()
+        with patch.object(app, "_refresh"):
+            for _ in range(len(app._FILTER_MODES)):
+                app.action_cycle_filter()
+        assert app._filter_mode == 0
+
+
+class TestCompactToggle:
+    def test_compact_binding_exists(self) -> None:
+        app = MonitoratorApp()
+        keys = [b.key for b in app.BINDINGS]
+        assert "v" in keys
+
+    def test_compact_default_false(self) -> None:
+        app = MonitoratorApp()
+        assert app._compact is False
+
+    def test_toggle_compact_flips_value(self) -> None:
+        app = MonitoratorApp()
+        assert app._compact is False
+        app.action_toggle_compact()
+        assert app._compact is True
+        app.action_toggle_compact()
+        assert app._compact is False
+
+
+class TestCopyCwd:
+    def test_copy_binding_exists(self) -> None:
+        app = MonitoratorApp()
+        keys = [b.key for b in app.BINDINGS]
+        assert "c" in keys

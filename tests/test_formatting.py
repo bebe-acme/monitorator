@@ -104,7 +104,7 @@ class TestStatusDicts:
         assert STATUS_LABELS[SessionStatus.THINKING] == "THINK"
         assert STATUS_LABELS[SessionStatus.EXECUTING] == "EXEC"
         assert STATUS_LABELS[SessionStatus.WAITING_PERMISSION] == "PERM!"
-        assert STATUS_LABELS[SessionStatus.IDLE] == "IDLE"
+        assert STATUS_LABELS[SessionStatus.IDLE] == "WAIT"
         assert STATUS_LABELS[SessionStatus.SUBAGENT_RUNNING] == "SUBAG"
         assert STATUS_LABELS[SessionStatus.TERMINATED] == "TERM"
         assert STATUS_LABELS[SessionStatus.UNKNOWN] == "???"
@@ -123,6 +123,21 @@ class TestStatusDicts:
         from monitorator.tui.formatting import STATUS_ICONS
 
         assert STATUS_ICONS[SessionStatus.WAITING_PERMISSION] == "\u26a0"
+
+    def test_idle_color_is_amber(self) -> None:
+        from monitorator.tui.formatting import STATUS_COLORS
+
+        assert STATUS_COLORS[SessionStatus.IDLE] == "#ffaa00"
+
+    def test_idle_icon_is_return_symbol(self) -> None:
+        from monitorator.tui.formatting import STATUS_ICONS
+
+        assert STATUS_ICONS[SessionStatus.IDLE] == "\u23ce"
+
+    def test_idle_label_is_wait(self) -> None:
+        from monitorator.tui.formatting import STATUS_LABELS
+
+        assert STATUS_LABELS[SessionStatus.IDLE] == "WAIT"
 
 
 class TestFormatActivityNeverEmpty:

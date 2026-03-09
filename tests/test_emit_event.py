@@ -270,6 +270,21 @@ class TestEmitEvent:
         data = json.loads((tmp_sessions_dir / "notif-test.json").read_text())
         assert data["status"] == "waiting_permission"
 
+    def test_user_prompt_system_message_skipped(self, tmp_sessions_dir: Path) -> None:
+        """System messages (XML-tagged) should NOT be saved as prompts."""
+        # Pre-create existing session with no prompt
+        run_hook({"type": "SessionStart", "session_id": "xml-skip-1", "cwd": "/tmp"}, tmp_sessions_dir)
+        event = {
+            "type": "UserPromptSubmit",
+            "session_id": "xml-skip-1",
+            "cwd": "/tmp",
+            "prompt": "<task-notification><task-id>abc</task-id></task-notification>",
+        }
+        run_hook(event, tmp_sessions_dir)
+        data = json.loads((tmp_sessions_dir / "xml-skip-1.json").read_text())
+        # The system message should NOT be saved as prompt
+        assert data.get("last_prompt_summary") is None or "<task" not in str(data.get("last_prompt_summary", ""))
+
     def test_completes_under_100ms(self, tmp_sessions_dir: Path) -> None:
         event = {
             "type": "SessionStart",
@@ -281,3 +296,35 @@ class TestEmitEvent:
         elapsed_ms = (time.monotonic() - start) * 1000
         # Allow generous 2000ms for subprocess overhead, script itself should be <100ms
         assert elapsed_ms < 2000, f"Hook took {elapsed_ms:.0f}ms"
+
+
+class TestIsSystemMessage:
+    def test_task_notification_is_system(self) -> None:
+        from hooks.emit_event import _is_system_message
+
+        assert _is_system_message("<task-notification><task-id>abc</task-id></task-notification>") is True
+
+    def test_system_reminder_is_system(self) -> None:
+        from hooks.emit_event import _is_system_message
+
+        assert _is_system_message("<system-reminder>You must do X</system-reminder>") is True
+
+    def test_command_name_is_system(self) -> None:
+        from hooks.emit_event import _is_system_message
+
+        assert _is_system_message("<command-name>review</command-name>") is True
+
+    def test_normal_text_is_not_system(self) -> None:
+        from hooks.emit_event import _is_system_message
+
+        assert _is_system_message("Fix the login bug") is False
+
+    def test_empty_is_not_system(self) -> None:
+        from hooks.emit_event import _is_system_message
+
+        assert _is_system_message("") is False
+
+    def test_text_with_angle_brackets_not_system(self) -> None:
+        from hooks.emit_event import _is_system_message
+
+        assert _is_system_message("use array[0] > array[1]") is False

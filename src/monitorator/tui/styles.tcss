@@ -44,8 +44,9 @@ ColumnHeader {
     dock: top;
     height: 2;
     background: #0a0a0a;
-    color: #666666;
+    color: #888888;
     padding: 0 1;
+    border-bottom: solid #1a1a1a;
 }
 
 
@@ -73,7 +74,7 @@ SessionRow {
     color: #cccccc;
     padding: 0 1;
     margin: 0;
-    border-bottom: solid #111111;
+    border-bottom: solid #222222;
 }
 
 SessionRow:hover {

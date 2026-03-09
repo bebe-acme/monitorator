@@ -7,6 +7,7 @@ STDLIB ONLY - no third-party imports. Must complete <100ms.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -29,6 +30,14 @@ def read_existing(sessions_dir: Path, session_id: str) -> dict[str, object]:
         except (json.JSONDecodeError, OSError):
             pass
     return {}
+
+
+def _is_system_message(text: str) -> bool:
+    """Check if text looks like a system/internal message (starts with XML tag)."""
+    stripped = text.strip()
+    if not stripped:
+        return False
+    return bool(re.match(r'^\s*<[a-zA-Z][\w-]*[ >/]', stripped))
 
 
 def truncate(text: str, max_len: int = 200) -> str:
@@ -139,9 +148,9 @@ def main() -> None:
 
     elif event_type == "UserPromptSubmit":
         state["status"] = "thinking"
-        prompt = event.get("prompt", "")
-        if prompt:
-            state["last_prompt_summary"] = truncate(str(prompt))
+        prompt = str(event.get("prompt", ""))
+        if prompt and not _is_system_message(prompt):
+            state["last_prompt_summary"] = truncate(prompt)
 
     elif event_type == "PreToolUse":
         state["status"] = "executing"

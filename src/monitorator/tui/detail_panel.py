@@ -90,53 +90,56 @@ class DetailPanel(Static):
 
         # Row 1: status icon + status label, PID, CPU, elapsed timer
         from monitorator.models import SessionStatus as SS
+        _active = {SS.THINKING, SS.EXECUTING, SS.SUBAGENT_RUNNING}
         status_label = status.value.upper().replace("_", " ")
         if status == SS.WAITING_PERMISSION:
             status_markup = f"[bold #ff3333 blink]{icon} {status_label} \u26a0\u26a0\u26a0[/]"
+        elif status in _active:
+            status_markup = f"[{color} blink]{icon}[/] [{color}]{status_label}[/]"
         else:
             status_markup = f"[{color}]{icon} {status_label}[/]"
         row1 = (
             f"{status_markup}"
             f"          "
-            f"[#666666]PID [/][#cccccc]{pid}[/]"
+            f"[#555555]PID [/][#cccccc]{pid}[/]"
             f"       "
-            f"[#666666]CPU [/][#cccccc]{cpu}[/]"
+            f"[#555555]CPU [/][#cccccc]{cpu}[/]"
             f"       "
-            f"[#666666]\u23f1 [/][#cccccc]{elapsed}[/]"
+            f"[#555555]\u23f1 [/][#cccccc]{elapsed}[/]"
         )
 
         # Row 2: branch + cwd
         row2 = (
-            f"[#666666]branch [/][#3399ff]{branch}[/]"
+            f"[#555555]branch [/][#3399ff]{branch}[/]"
             f"         "
-            f"[#666666]cwd [/][#cccccc]{cwd}[/]"
+            f"[#555555]cwd [/][#cccccc]{cwd}[/]"
         )
 
         # Row 2b: project description (if available from filesystem)
         desc_text = get_project_description(cwd_raw) if cwd_raw and cwd_raw != "-" else None
-        row_desc = f"[#666666]desc   [/][#ffcc00]{desc_text}[/]" if desc_text else ""
+        row_desc = f"[#555555]desc   [/][#ffcc00]{desc_text}[/]" if desc_text else ""
 
         # Row 3: tool (only if active)
         row3 = ""
         if last_tool:
-            row3 = f"[#666666]tool   [/][{color}]{last_tool[:65]}[/]"
+            row3 = f"[#555555]tool   [/][{color}]{last_tool[:65]}[/]"
 
         # Row 4: prompt (only if available)
         row4 = ""
         if prompt:
             truncated = prompt[:60]
-            row4 = f'[#666666]prompt [/][italic #cccccc]{truncated}[/]'
+            row4 = f'[#555555]prompt [/][italic #cccccc]{truncated}[/]'
         elif not s.hook_state and s.process_info and s.process_info.session_uuid:
             session_prompt = get_session_prompt(
                 s.process_info.cwd, s.process_info.session_uuid
             )
             if session_prompt:
-                row4 = f'[#666666]prompt [/][italic #cccccc]{session_prompt[:60]}[/]'
+                row4 = f'[#555555]prompt [/][italic #cccccc]{session_prompt[:60]}[/]'
 
         # Row 5: subagents (only if > 0)
         row5 = ""
         if subagents > 0:
-            row5 = f"[#666666]subagents [/][#cc66ff]{subagents}[/]"
+            row5 = f"[#555555]subagents [/][#cc66ff]{subagents}[/]"
 
         # Assemble the box
         lines = [

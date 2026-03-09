@@ -6,7 +6,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from monitorator.models import SessionState
+from monitorator.models import SessionState, SessionStatus
 
 
 class StateStore:
@@ -63,6 +63,33 @@ class StateStore:
         except FileNotFoundError:
             pass
 
+    def mark_dead_pids_terminated(self, active_pids: set[int]) -> list[str]:
+        """Mark sessions as terminated if their activity suggests they're dead.
+
+        Sessions that haven't been updated in > 5 minutes and have an active
+        status (THINKING/EXECUTING) are likely from dead processes.
+        """
+        marked: list[str] = []
+        now = time.time()
+        active_statuses = {
+            SessionStatus.THINKING,
+            SessionStatus.EXECUTING,
+            SessionStatus.SUBAGENT_RUNNING,
+            SessionStatus.WAITING_PERMISSION,
+        }
+
+        for state in self.list_all():
+            if state.status not in active_statuses:
+                continue
+            updated = state.updated_at or state.timestamp or 0
+            # If no update for > 5 min and status is "active", likely dead
+            if now - updated > 300:
+                state.status = SessionStatus.TERMINATED
+                self.write(state)
+                marked.append(state.session_id)
+
+        return marked
+
     def cleanup_stale(
         self,
         max_age_seconds: int = 3600,
@@ -71,7 +98,7 @@ class StateStore:
         now = time.time()
         removed: list[str] = []
         for state in self.list_all():
-            if active_cwds and state.cwd in active_cwds:
+            if active_cwds and state.cwd in active_cwds and state.status != SessionStatus.TERMINATED:
                 continue
             updated = state.updated_at or state.timestamp or 0
             if now - updated > max_age_seconds:

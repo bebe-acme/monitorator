@@ -83,9 +83,9 @@ class TestCountSessions:
 
 
 class TestHeaderBanner:
-    def test_banner_has_logo(self) -> None:
+    def test_banner_instantiates(self) -> None:
         banner = HeaderBanner()
-        assert banner._logo == "MONITORATOR"
+        assert isinstance(banner, HeaderBanner)
 
     def test_initial_stats_text_empty(self) -> None:
         banner = HeaderBanner()
@@ -94,7 +94,8 @@ class TestHeaderBanner:
     def test_do_render_initial_shows_waiting_message(self) -> None:
         banner = HeaderBanner()
         content = banner.content
-        assert "MONITORATOR" in content
+        assert "waiting for sessions" in content
+        assert "\u2588\u2584\u2588\u2584\u2588" in content  # █▄█▄█ (M top in half-block art)
 
     def test_update_counts_sets_stats_text(self) -> None:
         banner = HeaderBanner()
@@ -153,7 +154,7 @@ class TestHeaderBanner:
         assert "\u255d" in content  # ╝
 
     def test_has_four_lines(self) -> None:
-        """Bordered layout: top border + 2 content lines + bottom border."""
+        """Bordered layout: top border + 2 art lines + bottom border."""
         banner = HeaderBanner()
         sessions = [make_merged("s1", SessionStatus.THINKING)]
         banner.update_counts(sessions)
@@ -170,21 +171,13 @@ class TestHeaderBanner:
         # Timestamp format includes colons (HH:MM:SS)
         assert ":" in content
 
-    def test_line1_has_block_logo_and_title(self) -> None:
+    def test_line1_has_ascii_art_and_color(self) -> None:
         banner = HeaderBanner()
         sessions = [make_merged("s1", SessionStatus.THINKING)]
         banner.update_counts(sessions)
         content = banner.content
-        assert "\u2588" in content  # Full block char
+        assert "\u2588\u2584\u2588\u2584\u2588" in content  # █▄█▄█ (M top in half-block art)
         assert "bold #ffcc00" in content
-        assert "MONITORATOR" in content
-
-    def test_line2_has_subtitle(self) -> None:
-        banner = HeaderBanner()
-        sessions = [make_merged("s1", SessionStatus.THINKING)]
-        banner.update_counts(sessions)
-        content = banner.content
-        assert "claude code session monitor" in content
 
     def test_line1_stats_include_total_sessions(self) -> None:
         banner = HeaderBanner()
@@ -215,3 +208,27 @@ class TestHeaderBanner:
         banner.update_counts(sessions)
         content = banner.content
         assert "\u26a0" in content
+
+    def test_half_block_art_in_content(self) -> None:
+        """Verify the half-block pixel art MONITORATOR lines appear in rendered content."""
+        banner = HeaderBanner()
+        content = banner.content
+        # Line 1: M starts with █▄█▄█, O starts with ▄▀▀▄
+        assert "\u2588\u2584\u2588\u2584\u2588" in content  # █▄█▄█ (M top)
+        assert "\u2584\u2580\u2580\u2584" in content  # ▄▀▀▄ (O top)
+        # Line 2: M bottom is █ ▀ █, O bottom is ▀▄▄▀
+        assert "\u2588 \u2580 \u2588" in content  # █ ▀ █ (M bottom)
+        assert "\u2580\u2584\u2584\u2580" in content  # ▀▄▄▀ (O bottom)
+
+    def test_art_uses_half_block_chars(self) -> None:
+        """Verify half-block characters are used in the pixel art."""
+        banner = HeaderBanner()
+        content = banner.content
+        # Art should contain full block, upper half, and lower half characters
+        assert "\u2588" in content  # █ (full block)
+        assert "\u2580" in content  # ▀ (upper half block)
+        assert "\u2584" in content  # ▄ (lower half block)
+        # Art should NOT contain old box-drawing art characters (borders still use them)
+        # The art-specific sequences from the old version should be gone
+        assert "\u2560\u2566\u255d" not in content  # ╠╦╝ no longer in art
+        assert "\u2560\u2550\u2563" not in content  # ╠═╣ no longer in art

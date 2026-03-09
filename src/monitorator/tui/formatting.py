@@ -10,7 +10,7 @@ STATUS_ICONS: dict[SessionStatus, str] = {
     SessionStatus.THINKING: "\u25cf",           # ●
     SessionStatus.EXECUTING: "\u25b6",          # ▶
     SessionStatus.WAITING_PERMISSION: "\u26a0",  # ⚠
-    SessionStatus.IDLE: "\u25cb",               # ○
+    SessionStatus.IDLE: "\u23ce",               # ⏎
     SessionStatus.SUBAGENT_RUNNING: "\u25c6",   # ◆
     SessionStatus.TERMINATED: "\u00d7",         # ×
     SessionStatus.UNKNOWN: "?",
@@ -20,7 +20,7 @@ STATUS_COLORS: dict[SessionStatus, str] = {
     SessionStatus.THINKING: "#00ff66",
     SessionStatus.EXECUTING: "#3399ff",
     SessionStatus.WAITING_PERMISSION: "#ff3333",
-    SessionStatus.IDLE: "#666666",
+    SessionStatus.IDLE: "#ffaa00",
     SessionStatus.SUBAGENT_RUNNING: "#cc66ff",
     SessionStatus.TERMINATED: "#444444",
     SessionStatus.UNKNOWN: "#444444",
@@ -30,7 +30,7 @@ STATUS_LABELS: dict[SessionStatus, str] = {
     SessionStatus.THINKING: "THINK",
     SessionStatus.EXECUTING: "EXEC",
     SessionStatus.WAITING_PERMISSION: "PERM!",
-    SessionStatus.IDLE: "IDLE",
+    SessionStatus.IDLE: "WAIT",
     SessionStatus.SUBAGENT_RUNNING: "SUBAG",
     SessionStatus.TERMINATED: "TERM",
     SessionStatus.UNKNOWN: "???",

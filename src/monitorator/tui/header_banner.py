@@ -12,9 +12,9 @@ _ACTIVE_STATUSES = {
     SessionStatus.SUBAGENT_RUNNING,
 }
 
-# ── Block logo glyphs ──────────────────────────────────────
-_LOGO_L1 = "\u2588\u2588\u2584"  # ██▄
-_LOGO_L2 = "\u2588\u2588\u2580"  # ██▀
+# ── Half-block pixel art logo (2-line chunky retro font) ──
+_ART_L1 = "█▄█▄█ ▄▀▀▄ █▄ █ █ ▀█▀ ▄▀▀▄ █▀▄ ▄▀▀▄ ▀█▀ ▄▀▀▄ █▀▄"
+_ART_L2 = "█ ▀ █ ▀▄▄▀ █ ▀█ █  █  ▀▄▄▀ █▀▄ █▀▀█  █  ▀▄▄▀ █▀▄"
 
 # ── Box-drawing characters ─────────────────────────────────
 _TL = "\u2554"  # ╔
@@ -43,7 +43,6 @@ class HeaderBanner(Static):
 
     def __init__(self) -> None:
         super().__init__("")
-        self._logo = "MONITORATOR"
         self._stats_text = ""
         self._do_render()
 
@@ -54,37 +53,35 @@ class HeaderBanner(Static):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if self._stats_text:
-            line1_right, line2_right = self._stats_text.split("\n", 1)
+            stats_parts = self._stats_text.split("\n", 1)
+            stats_l1 = stats_parts[0] if len(stats_parts) > 0 else ""
+            stats_l2 = stats_parts[1] if len(stats_parts) > 1 else ""
         else:
-            line1_right = "[#666666]waiting for sessions\u2026[/]"
-            line2_right = ""
+            stats_l1 = "[#666666]waiting for sessions\u2026[/]"
+            stats_l2 = ""
 
-        # Top border
-        top_border = f"[#333300]{_TL}{_H * (_BOX_WIDTH - 2)}{_TR}[/]"
+        top = f"[#333300]{_TL}{_H * (_BOX_WIDTH - 2)}{_TR}[/]"
 
-        # Line 1: logo + title + timestamp
+        # Line 1: pixel art top + stats + timestamp
         line1 = (
             f"[#333300]{_V}[/]  "
-            f"[#ffcc00]{_LOGO_L1}[/] "
-            f"[bold #ffcc00]{self._logo}[/]"
-            f"    {line1_right}"
-            f"    [#666666]{timestamp}[/]"
-            f"    [#333300]{_V}[/]"
+            f"[bold #ffcc00]{_ART_L1}[/]"
+            f"     {stats_l1}"
+            f"  [#666666]{timestamp}[/]"
+            f"  [#333300]{_V}[/]"
         )
 
-        # Line 2: subtitle + stats
+        # Line 2: pixel art bottom + idle stats
         line2 = (
             f"[#333300]{_V}[/]  "
-            f"[#ffcc00]{_LOGO_L2}[/] "
-            f"[#555555]claude code session monitor[/]"
-            f"       {line2_right}"
+            f"[bold #ffcc00]{_ART_L2}[/]"
+            f"     {stats_l2}"
             f"    [#333300]{_V}[/]"
         )
 
-        # Bottom border
-        bottom_border = f"[#333300]{_BL}{_H * (_BOX_WIDTH - 2)}{_BR}[/]"
+        bottom = f"[#333300]{_BL}{_H * (_BOX_WIDTH - 2)}{_BR}[/]"
 
-        self.update(f"{top_border}\n{line1}\n{line2}\n{bottom_border}")
+        self.update(f"{top}\n{line1}\n{line2}\n{bottom}")
 
     def update_counts(self, sessions: list[MergedSession]) -> None:
         """Recompute stats from live session list and re-render."""
@@ -97,11 +94,11 @@ class HeaderBanner(Static):
         )
         if counts["active"]:
             parts_l1.append(
-                f"[bold #00ff66]\u25cf {counts['active']}[/] [#999999]active[/]"
+                f"[bold #00ff66 blink]\u25cf[/] [bold #00ff66]{counts['active']}[/] [#999999]active[/]"
             )
         if counts["waiting"]:
             parts_l1.append(
-                f"[bold #ff3333]\u26a0 {counts['waiting']}[/]"
+                f"[bold #ff3333 blink]\u26a0 {counts['waiting']}[/]"
             )
 
         # ── Line 2 right: idle ──────────────────────────────

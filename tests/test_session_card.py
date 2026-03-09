@@ -151,7 +151,7 @@ class TestStatusIcons:
         assert STATUS_ICONS[SessionStatus.WAITING_PERMISSION] == "\u26a0"
 
     def test_idle_icon(self) -> None:
-        assert STATUS_ICONS[SessionStatus.IDLE] == "\u25cb"
+        assert STATUS_ICONS[SessionStatus.IDLE] == "\u23ce"
 
     def test_subagent_icon(self) -> None:
         assert STATUS_ICONS[SessionStatus.SUBAGENT_RUNNING] == "\u25c6"
