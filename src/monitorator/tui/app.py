@@ -20,6 +20,7 @@ from monitorator.tui.header_banner import HeaderBanner, RefreshRequested
 from monitorator.tui.column_header import ColumnHeader
 from monitorator.tui.help_screen import HelpScreen
 from monitorator.tui.session_row import SessionRow
+from monitorator.tui.chat_dropdown import ChatDropdown
 from monitorator.tui.detail_panel import DetailPanel
 
 CSS_PATH = Path(__file__).parent / "styles.tcss"
@@ -45,6 +46,8 @@ class MonitoratorApp(App[None]):
         Binding("r", "refresh", "Refresh"),
         Binding("R", "force_refresh", "Force Refresh"),
         Binding("o", "open_terminal", "Open Terminal"),
+        Binding("up", "cursor_up", "Up", show=False, priority=True),
+        Binding("down", "cursor_down", "Down", show=False, priority=True),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("enter", "select_session", "Select"),
@@ -53,6 +56,7 @@ class MonitoratorApp(App[None]):
         Binding("f", "cycle_filter", "Filter", show=False),
         Binding("v", "toggle_compact", "Compact", show=False),
         Binding("c", "copy_cwd", "Copy CWD", show=False),
+        Binding("escape", "close_dropdown", "Close", show=False),
     ]
 
     _SORT_MODES = ["time", "status", "project"]
@@ -67,6 +71,9 @@ class MonitoratorApp(App[None]):
         self._previous: dict[str, MergedSession] = {}
         self._cards: dict[str, SessionRow] = {}
         self._focused_session_id: str | None = None
+        self._dropdowns: dict[str, ChatDropdown] = {}
+        self._dropdown_scroll_cache: dict[str, float] = {}
+        self._stable_order: list[str] = []  # session IDs in display order (newest first)
         self._sort_mode: int = 0
         self._filter_mode: int = 0
         self._compact: bool = False
@@ -124,25 +131,20 @@ class MonitoratorApp(App[None]):
         elif filter_mode == "permission":
             merged = [m for m in merged if m.effective_status == SessionStatus.WAITING_PERMISSION]
 
-        # Sort based on current mode
-        _STATUS_PRIORITY = {
-            SessionStatus.WAITING_PERMISSION: 0,
-            SessionStatus.THINKING: 1,
-            SessionStatus.EXECUTING: 2,
-            SessionStatus.SUBAGENT_RUNNING: 3,
-            SessionStatus.IDLE: 4,
-            SessionStatus.UNKNOWN: 5,
-            SessionStatus.TERMINATED: 6,
-        }
-        sort_mode = self._SORT_MODES[self._sort_mode % len(self._SORT_MODES)]
-        if sort_mode == "time":
-            merged.sort(key=lambda m: m.last_interaction_time, reverse=True)
-        elif sort_mode == "status":
-            merged.sort(key=lambda m: _STATUS_PRIORITY.get(m.effective_status, 99))
-        elif sort_mode == "project":
-            merged.sort(key=lambda m: m.project_name.lower())
-
         current = {m.session_id: m for m in merged}
+
+        # Stable ordering: keep existing positions, append new sessions at top
+        # sorted by newest-first.  Remove gone sessions.
+        current_ids = set(current.keys())
+        new_ids = current_ids - set(self._stable_order)
+        if new_ids:
+            new_sorted = sorted(
+                new_ids,
+                key=lambda sid: current[sid].last_interaction_time,
+                reverse=True,
+            )
+            self._stable_order = new_sorted + self._stable_order
+        self._stable_order = [sid for sid in self._stable_order if sid in current_ids]
         previous = self._previous
         self._notifier.check_transitions(previous, current)
         self._previous = current
@@ -162,6 +164,9 @@ class MonitoratorApp(App[None]):
         for sid in existing_ids - current_ids:
             card = self._cards.pop(sid)
             card.remove()
+            if sid in self._dropdowns:
+                self._dropdowns.pop(sid).remove()
+                self._dropdown_scroll_cache.pop(sid, None)
 
         # Update existing rows
         for sid in existing_ids & current_ids:
@@ -173,14 +178,25 @@ class MonitoratorApp(App[None]):
             self._cards[sid] = row
             container.mount(row)
 
-        # Reorder rows to match sorted order (most recently interacted first)
-        sorted_sids = list(current.keys())
-        for i, sid in enumerate(sorted_sids):
+        # Reorder rows to match stable order (newest first, positions don't shift)
+        for i, sid in enumerate(self._stable_order):
             if sid in self._cards:
                 container.move_child(self._cards[sid], before=i)
 
-        # Rebuild _cards in sorted order for consistent indexing
-        self._cards = {sid: self._cards[sid] for sid in sorted_sids if sid in self._cards}
+        # Rebuild _cards in stable order for consistent indexing
+        self._cards = {sid: self._cards[sid] for sid in self._stable_order if sid in self._cards}
+
+        # Reposition all open dropdowns after their associated rows
+        for sid, dropdown in list(self._dropdowns.items()):
+            if sid in self._cards:
+                row = self._cards[sid]
+                children = list(container.children)
+                row_pos = children.index(row)
+                container.move_child(dropdown, before=row_pos + 1)
+            else:
+                dropdown.remove()
+                self._dropdowns.pop(sid)
+                self._dropdown_scroll_cache.pop(sid, None)
 
         # Re-index all rows
         for i, sid in enumerate(self._cards, start=1):
@@ -233,18 +249,52 @@ class MonitoratorApp(App[None]):
                 open_terminal_for_pid(session.process_info.pid)
 
     def action_cursor_down(self) -> None:
-        self.action_focus_next()
+        self._focus_adjacent_row(direction=1)
 
     def action_cursor_up(self) -> None:
-        self.action_focus_previous()
+        self._focus_adjacent_row(direction=-1)
+
+    def _focus_adjacent_row(self, direction: int) -> None:
+        """Focus next/previous SessionRow, skipping ChatDropdown widgets."""
+        order = list(self._cards.keys())
+        if not order:
+            return
+
+        focused = self.focused
+        current_sid = None
+        if isinstance(focused, SessionRow):
+            current_sid = focused.session_id
+
+        if current_sid is None or current_sid not in order:
+            # Nothing focused or unknown — focus first/last row
+            target = order[0] if direction == 1 else order[-1]
+        else:
+            idx = order.index(current_sid)
+            new_idx = idx + direction
+            if new_idx < 0 or new_idx >= len(order):
+                return  # at boundary
+            target = order[new_idx]
+
+        if target in self._cards:
+            self._cards[target].focus()
 
     def action_select_session(self) -> None:
         focused = self.focused
         if isinstance(focused, SessionRow):
-            self._show_detail(focused.session_id)
+            self._show_detail(focused.session_id, focus_dropdown=True)
 
     def on_session_row_selected(self, event: SessionRow.Selected) -> None:
         self._show_detail(event.session_id)
+
+    def action_close_dropdown(self) -> None:
+        """Close the dropdown for the currently focused session row."""
+        focused = self.focused
+        if isinstance(focused, SessionRow):
+            sid = focused.session_id
+            if sid in self._dropdowns:
+                dropdown = self._dropdowns.pop(sid)
+                self._dropdown_scroll_cache[sid] = dropdown.scroll_y
+                dropdown.remove()
 
     def action_help(self) -> None:
         """Show help overlay with keybindings."""
@@ -283,7 +333,28 @@ class MonitoratorApp(App[None]):
                 except (subprocess.SubprocessError, FileNotFoundError):
                     self.notify("Failed to copy", severity="error")
 
-    def _show_detail(self, session_id: str) -> None:
+    def _toggle_dropdown(self, session_id: str, focus: bool = False) -> None:
+        """Toggle the chat history dropdown for a session row."""
+        container = self.query_one("#session-list", VerticalScroll)
+
+        # If already open for this session, close it (save scroll position)
+        if session_id in self._dropdowns:
+            dropdown = self._dropdowns.pop(session_id)
+            self._dropdown_scroll_cache[session_id] = dropdown.scroll_y
+            dropdown.remove()
+            return
+
+        # Open new dropdown after the row
+        session = self._previous.get(session_id)
+        if session and session_id in self._cards:
+            saved_scroll = self._dropdown_scroll_cache.get(session_id)
+            dropdown = ChatDropdown(session, initial_scroll_y=saved_scroll)
+            container.mount(dropdown, after=self._cards[session_id])
+            self._dropdowns[session_id] = dropdown
+            if focus:
+                dropdown.focus()
+
+    def _show_detail(self, session_id: str, focus_dropdown: bool = False) -> None:
         self._focused_session_id = session_id
         session = self._previous.get(session_id)
         panel = self.query_one(DetailPanel)
@@ -291,3 +362,4 @@ class MonitoratorApp(App[None]):
             panel.show_session(session)
         else:
             panel.clear_session()
+        self._toggle_dropdown(session_id, focus=focus_dropdown)

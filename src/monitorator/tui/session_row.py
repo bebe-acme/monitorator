@@ -138,6 +138,7 @@ class SessionRow(Static, can_focus=True):
         self._anim_frame: int = 0
         self._compact: bool = False
         super().__init__(self._build_content(), markup=True)
+        self._sync_needs_input()
 
     def _build_content(self) -> str:
         s = self.session
@@ -265,9 +266,17 @@ class SessionRow(Static, can_focus=True):
         self._anim_frame += 1
         self.update(self._build_content())
 
+    def _sync_needs_input(self) -> None:
+        """Add or remove the needs-input CSS class based on session status."""
+        if self.session.effective_status == SessionStatus.WAITING_PERMISSION:
+            self.add_class("needs-input")
+        else:
+            self.remove_class("needs-input")
+
     def update_session(self, session: MergedSession) -> None:
         """Update row with new session data without recreating widget."""
         self.session = session
+        self._sync_needs_input()
         self.refresh_content()
 
     def on_click(self) -> None:

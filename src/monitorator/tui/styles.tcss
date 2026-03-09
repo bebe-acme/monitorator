@@ -88,6 +88,16 @@ SessionRow:focus {
     border-left: thick #ffcc00;
 }
 
+SessionRow.needs-input {
+    background: #1a0505;
+    border-left: thick #ff3333;
+}
+
+SessionRow.needs-input:focus {
+    background: #1a0505;
+    border-left: thick #ff3333;
+}
+
 
 /* ─── Detail Panel ─── */
 
@@ -118,6 +128,47 @@ DetailPanel .detail-warn {
 
 DetailPanel .detail-info {
     color: #3399ff;
+}
+
+
+/* ─── Chat Dropdown ─── */
+
+ChatDropdown {
+    height: auto;
+    max-height: 16;
+    background: #0e0e0e;
+    border-left: wide #333300;
+    padding: 0 0;
+    margin: 0 0 0 2;
+    scrollbar-size: 1 1;
+    scrollbar-color: #333300;
+    scrollbar-color-hover: #ffcc00;
+    scrollbar-color-active: #ffcc00;
+    scrollbar-background: #0e0e0e;
+    scrollbar-background-hover: #111111;
+    scrollbar-background-active: #111111;
+}
+
+ChatMessage {
+    height: auto;
+    padding: 0 1;
+    margin: 0;
+}
+
+ChatMessage.user-msg {
+    padding: 1 1 0 1;
+}
+
+ChatMessage.turn-start {
+    border-top: solid #1a1a1a;
+}
+
+ChatMessage.assistant-msg {
+    padding: 0 1 0 1;
+}
+
+ChatMessage.tool-msg {
+    padding: 0 1 0 1;
 }
 
 
