@@ -4,8 +4,9 @@ import json
 import shutil
 from pathlib import Path
 
-HOOK_SCRIPT = Path(__file__).parent.parent.parent / "hooks" / "emit_event.py"
-MARKER = "emit_event.py"
+HOOK_SCRIPT_PY = Path(__file__).parent.parent.parent / "hooks" / "emit_event.py"
+HOOK_BINARY_ZIG = Path(__file__).parent.parent.parent / "hooks" / "zig" / "zig-out" / "bin" / "emit_event"
+MARKER = "emit_event"
 
 HOOK_EVENTS = [
     "PreToolUse",
@@ -18,12 +19,19 @@ HOOK_EVENTS = [
 ]
 
 
+def _resolve_hook_command() -> str:
+    """Prefer compiled Zig binary; fall back to Python script."""
+    if HOOK_BINARY_ZIG.exists():
+        return str(HOOK_BINARY_ZIG.resolve())
+    return f"python3 {HOOK_SCRIPT_PY.resolve()}"
+
+
 class HookInstaller:
     def __init__(self, settings_path: Path | None = None) -> None:
         if settings_path is None:
             settings_path = Path.home() / ".claude" / "settings.json"
         self._path = settings_path
-        self._hook_command = f"python3 {HOOK_SCRIPT.resolve()}"
+        self._hook_command = _resolve_hook_command()
 
     def _read_settings(self) -> dict[str, object]:
         if self._path.exists():
