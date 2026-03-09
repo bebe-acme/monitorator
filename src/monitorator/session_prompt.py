@@ -16,7 +16,7 @@ _XML_TAG_RE = re.compile(r"^\s*<[a-zA-Z][\w-]*[ >/]")
 def mangle_cwd(cwd: str) -> str:
     """Mangle a cwd path to match Claude's project directory naming.
 
-    "/Users/beib/playground_beib" → "-Users-beib-playground-beib"
+    "/Users/alice/playground" → "-Users-alice-playground"
     """
     return "-" + cwd.lstrip("/").replace("/", "-").replace("_", "-")
 

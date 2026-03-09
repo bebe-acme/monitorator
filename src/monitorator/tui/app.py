@@ -24,6 +24,7 @@ from monitorator.tui.detail_panel import DetailPanel
 CSS_PATH = Path(__file__).parent / "styles.tcss"
 SESSIONS_DIR = Path.home() / ".monitorator" / "sessions"
 POLL_INTERVAL = 2.0
+ANIM_INTERVAL = 0.3  # sprite animation refresh (visual-only, no I/O)
 
 _STALE_ACTIVE_STATUSES = {
     SessionStatus.THINKING,
@@ -78,6 +79,7 @@ class MonitoratorApp(App[None]):
     def on_mount(self) -> None:
         self._refresh()
         self.set_interval(POLL_INTERVAL, self._refresh)
+        self.set_interval(ANIM_INTERVAL, self._tick_sprites)
 
     def _refresh(self) -> None:
         processes = self._scanner.scan()
@@ -143,9 +145,11 @@ class MonitoratorApp(App[None]):
         self._notifier.check_transitions(previous, current)
         self._previous = current
 
-        # Update header
+        # Update header + column header for responsive layout
         banner = self.query_one(HeaderBanner)
         banner.update_counts(merged)
+        col_header = self.query_one(ColumnHeader)
+        col_header.rebuild()
 
         # Diff-based row update
         container = self.query_one("#session-list", VerticalScroll)
@@ -200,6 +204,11 @@ class MonitoratorApp(App[None]):
                 if sid in self._cards:
                     self._cards[sid].focus()
                 break
+
+    def _tick_sprites(self) -> None:
+        """Fast visual-only refresh: update sprite animation frames without I/O."""
+        for card in self._cards.values():
+            card.refresh_content()
 
     def action_refresh(self) -> None:
         self._refresh()

@@ -1,2 +1,0 @@
-#!/bin/bash
-cd /Users/beib/Desktop/playground_beib/monitorator && exec uv run monitorator "$@"

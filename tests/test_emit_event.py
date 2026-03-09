@@ -143,7 +143,7 @@ class TestEmitEvent:
         event = {
             "type": "SessionStart",
             "session_id": "sess-009",
-            "cwd": "/Users/beib/projects/agentator",
+            "cwd": "/Users/testuser/projects/agentator",
         }
         run_hook(event, tmp_sessions_dir)
         data = json.loads((tmp_sessions_dir / "sess-009.json").read_text())

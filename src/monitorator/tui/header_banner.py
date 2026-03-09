@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from textual.widgets import Static
 
 from monitorator.models import MergedSession, SessionStatus
+from monitorator.tui.sprites import SPRITE_TEMPLATES, render_sprite
 
 _ACTIVE_STATUSES = {
     SessionStatus.THINKING,
@@ -12,19 +11,11 @@ _ACTIVE_STATUSES = {
     SessionStatus.SUBAGENT_RUNNING,
 }
 
-# ── Half-block pixel art logo (2-line chunky retro font) ──
-_ART_L1 = "█▄█▄█ ▄▀▀▄ █▄ █ █ ▀█▀ ▄▀▀▄ █▀▄ ▄▀▀▄ ▀█▀ ▄▀▀▄ █▀▄"
-_ART_L2 = "█ ▀ █ ▀▄▄▀ █ ▀█ █  █  ▀▄▄▀ █▀▄ █▀▀█  █  ▀▄▄▀ █▀▄"
+# ── Ghost sprite (yellow palette for header logo) ──
+_GHOST_GRID = SPRITE_TEMPLATES[1]
+_GHOST_PALETTE = {2: "#ffcc00", 3: "#ffffff", 4: "#0a0a0a"}
 
-# ── Box-drawing characters ─────────────────────────────────
-_TL = "\u2554"  # ╔
-_TR = "\u2557"  # ╗
-_BL = "\u255a"  # ╚
-_BR = "\u255d"  # ╝
-_H = "\u2550"   # ═
-_V = "\u2551"   # ║
-
-_BOX_WIDTH = 92
+_GAP = "  "
 
 
 def count_sessions(sessions: list[MergedSession]) -> dict[str, int]:
@@ -39,78 +30,65 @@ def count_sessions(sessions: list[MergedSession]) -> dict[str, int]:
 
 
 class HeaderBanner(Static):
-    """Bordered header banner with block logo, stats, and timestamp."""
+    """Header banner with ghost logo, title, and stats.
+
+    Uses CSS border for framing -- no manual box-drawing characters.
+    Content is 5 lines tall (matching the ghost sprite height).
+
+    Layout (each line starts with one ghost sprite line + 2-space gap):
+      Line 1: ghost (top)
+      Line 2: ghost
+      Line 3: ghost + session stats (total + active + idle + waiting)
+      Line 4: ghost + MONITORATOR title
+      Line 5: ghost (bottom)
+    """
 
     def __init__(self) -> None:
         super().__init__("")
         self._stats_text = ""
         self._do_render()
 
-    # CRITICAL: never define _render_content — it shadows Textual 8 internals.
+    # CRITICAL: never define _render_content -- it shadows Textual 8 internals.
 
     def _do_render(self) -> None:
         """Rebuild the Rich markup and push it into the Static widget."""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ghost = render_sprite(_GHOST_GRID, _GHOST_PALETTE)
 
         if self._stats_text:
-            stats_parts = self._stats_text.split("\n", 1)
-            stats_l1 = stats_parts[0] if len(stats_parts) > 0 else ""
-            stats_l2 = stats_parts[1] if len(stats_parts) > 1 else ""
+            stats_line = self._stats_text
         else:
-            stats_l1 = "[#666666]waiting for sessions\u2026[/]"
-            stats_l2 = ""
+            stats_line = "[#666666]waiting for sessions\u2026[/]"
 
-        top = f"[#333300]{_TL}{_H * (_BOX_WIDTH - 2)}{_TR}[/]"
+        title = "[bold #ffcc00]MONITORATOR[/]"
 
-        # Line 1: pixel art top + stats + timestamp
-        line1 = (
-            f"[#333300]{_V}[/]  "
-            f"[bold #ffcc00]{_ART_L1}[/]"
-            f"     {stats_l1}"
-            f"  [#666666]{timestamp}[/]"
-            f"  [#333300]{_V}[/]"
-        )
+        line1 = f"{ghost[0]}"
+        line2 = f"{ghost[1]}"
+        line3 = f"{ghost[2]}{_GAP}{stats_line}"
+        line4 = f"{ghost[3]}{_GAP}{title}"
+        line5 = f"{ghost[4]}"
 
-        # Line 2: pixel art bottom + idle stats
-        line2 = (
-            f"[#333300]{_V}[/]  "
-            f"[bold #ffcc00]{_ART_L2}[/]"
-            f"     {stats_l2}"
-            f"    [#333300]{_V}[/]"
-        )
-
-        bottom = f"[#333300]{_BL}{_H * (_BOX_WIDTH - 2)}{_BR}[/]"
-
-        self.update(f"{top}\n{line1}\n{line2}\n{bottom}")
+        self.update(f"{line1}\n{line2}\n{line3}\n{line4}\n{line5}")
 
     def update_counts(self, sessions: list[MergedSession]) -> None:
         """Recompute stats from live session list and re-render."""
         counts = count_sessions(sessions)
 
-        # ── Line 1 right: total + active + waiting ──────────
-        parts_l1: list[str] = []
-        parts_l1.append(
+        parts: list[str] = []
+        parts.append(
             f"[bold #ffcc00]\u25c6 {counts['total']}[/] [#999999]sessions[/]"
         )
         if counts["active"]:
-            parts_l1.append(
-                f"[bold #00ff66 blink]\u25cf[/] [bold #00ff66]{counts['active']}[/] [#999999]active[/]"
+            parts.append(
+                f"[bold #00ff66]\u25cf {counts['active']}[/] [#999999]active[/]"
             )
-        if counts["waiting"]:
-            parts_l1.append(
-                f"[bold #ff3333 blink]\u26a0 {counts['waiting']}[/]"
-            )
-
-        # ── Line 2 right: idle ──────────────────────────────
-        parts_l2: list[str] = []
         if counts["idle"]:
-            parts_l2.append(
+            parts.append(
                 f"[#666666]\u25cb {counts['idle']} idle[/]"
             )
+        if counts["waiting"]:
+            parts.append(
+                f"[bold #ff3333]\u26a0 {counts['waiting']}[/]"
+            )
 
-        self._stats_text = (
-            "  ".join(parts_l1)
-            + "\n"
-            + "  ".join(parts_l2)
-        )
+        self._stats_text = "  ".join(parts)
         self._do_render()

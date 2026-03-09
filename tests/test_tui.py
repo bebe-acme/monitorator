@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from monitorator.models import MergedSession, ProcessInfo, SessionState, SessionStatus
-from monitorator.tui.app import MonitoratorApp, _STALE_ACTIVE_STATUSES, STALE_HOOK_THRESHOLD
+from monitorator.tui.app import MonitoratorApp, _STALE_ACTIVE_STATUSES, STALE_HOOK_THRESHOLD, ANIM_INTERVAL
 from monitorator.tui.header_banner import HeaderBanner
 from monitorator.tui.column_header import ColumnHeader
 from monitorator.tui.session_row import SessionRow
@@ -370,6 +370,32 @@ class TestCompactToggle:
         assert app._compact is True
         app.action_toggle_compact()
         assert app._compact is False
+
+
+class TestAnimationTimer:
+    def test_anim_interval_is_fast(self) -> None:
+        """Animation interval should be much faster than data poll interval."""
+        assert ANIM_INTERVAL < 1.0
+        assert ANIM_INTERVAL > 0.1
+
+    def test_tick_sprites_method_exists(self) -> None:
+        app = MonitoratorApp()
+        assert hasattr(app, "_tick_sprites")
+        assert callable(app._tick_sprites)
+
+    def test_tick_sprites_increments_frames_on_cards(self) -> None:
+        """_tick_sprites() should call refresh_content() on each card."""
+        app = MonitoratorApp()
+        mock_card = MagicMock()
+        app._cards = {"s1": mock_card, "s2": MagicMock()}
+        app._tick_sprites()
+        mock_card.refresh_content.assert_called_once()
+        app._cards["s2"].refresh_content.assert_called_once()
+
+    def test_tick_sprites_no_cards_no_error(self) -> None:
+        app = MonitoratorApp()
+        app._cards = {}
+        app._tick_sprites()  # should not raise
 
 
 class TestCopyCwd:

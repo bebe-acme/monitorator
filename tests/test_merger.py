@@ -240,13 +240,13 @@ class TestSessionMerger:
         """Hook cwd that is a subdirectory of process cwd should match."""
         states = [SessionState(
             session_id="sub1",
-            cwd="/Users/beib/projects/bbmedia/projects/podcast",
+            cwd="/Users/testuser/projects/bbmedia/projects/podcast",
             status=SessionStatus.EXECUTING,
             updated_at=time.time(),
         )]
         processes = [ProcessInfo(
             pid=100, cpu_percent=15.0, elapsed_seconds=60,
-            cwd="/Users/beib/projects/bbmedia",
+            cwd="/Users/testuser/projects/bbmedia",
             command="claude",
         )]
         merger = SessionMerger()
@@ -259,13 +259,13 @@ class TestSessionMerger:
         """Process cwd that is a subdirectory of hook cwd should also match."""
         states = [SessionState(
             session_id="sub2",
-            cwd="/Users/beib/projects/bbmedia",
+            cwd="/Users/testuser/projects/bbmedia",
             status=SessionStatus.THINKING,
             updated_at=time.time(),
         )]
         processes = [ProcessInfo(
             pid=200, cpu_percent=10.0, elapsed_seconds=60,
-            cwd="/Users/beib/projects/bbmedia/projects/podcast",
+            cwd="/Users/testuser/projects/bbmedia/projects/podcast",
             command="claude",
         )]
         merger = SessionMerger()
@@ -277,13 +277,13 @@ class TestSessionMerger:
         """Unrelated paths should not match even with common prefix."""
         states = [SessionState(
             session_id="unrel",
-            cwd="/Users/beib/projects/foo",
+            cwd="/Users/testuser/projects/foo",
             status=SessionStatus.IDLE,
             updated_at=time.time(),
         )]
         processes = [ProcessInfo(
             pid=300, cpu_percent=5.0, elapsed_seconds=60,
-            cwd="/Users/beib/projects/foobar",
+            cwd="/Users/testuser/projects/foobar",
             command="claude",
         )]
         merger = SessionMerger()
@@ -307,3 +307,68 @@ class TestSessionMerger:
         ids = {m.session_id for m in merged}
         assert "s1" in ids
         assert "s2" in ids
+
+
+class TestSessionMergerDedup:
+    """Dedup sessions sharing the same cwd (zombie cleanup)."""
+
+    def test_same_cwd_keeps_most_recent(self) -> None:
+        """When two hook states share cwd, the most recently updated wins."""
+        now = time.time()
+        states = [
+            SessionState(session_id="old", cwd="/proj", status=SessionStatus.IDLE, updated_at=now - 60),
+            SessionState(session_id="new", cwd="/proj", status=SessionStatus.THINKING, updated_at=now),
+        ]
+        processes = [
+            ProcessInfo(pid=100, cpu_percent=20.0, elapsed_seconds=30, cwd="/proj", command="claude"),
+        ]
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        non_stale = [m for m in merged if not m.is_stale]
+        assert len(non_stale) == 1
+        assert non_stale[0].session_id == "new"
+
+    def test_same_cwd_no_process_keeps_newest(self) -> None:
+        """When two hook states share cwd and neither has process, keep newest."""
+        now = time.time()
+        states = [
+            SessionState(session_id="old", cwd="/proj", status=SessionStatus.IDLE, updated_at=now - 60),
+            SessionState(session_id="new", cwd="/proj", status=SessionStatus.THINKING, updated_at=now),
+        ]
+        processes: list[ProcessInfo] = []
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        non_stale = [m for m in merged if not m.is_stale]
+        assert len(non_stale) == 1
+        assert non_stale[0].session_id == "new"
+
+    def test_different_cwds_not_deduped(self) -> None:
+        """Sessions with different cwds should not be deduped."""
+        now = time.time()
+        states = [
+            SessionState(session_id="s1", cwd="/a", status=SessionStatus.THINKING, updated_at=now),
+            SessionState(session_id="s2", cwd="/b", status=SessionStatus.THINKING, updated_at=now),
+        ]
+        processes: list[ProcessInfo] = []
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        non_stale = [m for m in merged if not m.is_stale]
+        assert len(non_stale) == 2
+
+    def test_same_cwd_both_have_processes_keeps_newest(self) -> None:
+        """If multiple sessions with same cwd both have processes, keep only the newest."""
+        now = time.time()
+        states = [
+            SessionState(session_id="s1", cwd="/proj", status=SessionStatus.THINKING, updated_at=now),
+            SessionState(session_id="s2", cwd="/proj", status=SessionStatus.IDLE, updated_at=now - 10),
+        ]
+        processes = [
+            ProcessInfo(pid=100, cpu_percent=20.0, elapsed_seconds=30, cwd="/proj", command="claude"),
+            ProcessInfo(pid=200, cpu_percent=5.0, elapsed_seconds=60, cwd="/proj", command="claude"),
+        ]
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        non_stale = [m for m in merged if not m.is_stale]
+        # Only the most recent session survives dedup
+        assert len(non_stale) == 1
+        assert non_stale[0].session_id == "s1"

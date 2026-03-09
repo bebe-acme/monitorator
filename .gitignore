@@ -28,3 +28,14 @@ htmlcov/
 
 # uv
 # uv.lock is committed for reproducible builds
+
+# Session logs (personal)
+SESSION_LOG.md
+SPRITES_WEB_INTEGRATION.md
+
+# Scripts cache
+scripts/__pycache__/
+
+# Environment
+.env
+.env.local

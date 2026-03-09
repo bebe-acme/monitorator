@@ -75,12 +75,4 @@ Three core dataclasses: `SessionState` (hook data), `ProcessInfo` (ps/lsof data)
 - `hooks/emit_event.py` must remain stdlib-only (no third-party imports)
 - Tests use `pytest` with `pytest-asyncio` (asyncio_mode = "auto")
 - Session data path: `~/.monitorator/sessions/`
-- Claude project path mangling: `/Users/beib/foo_bar` → `-Users-beib-foo-bar`
-
-
-## Session Tracking
-
-> Sessions are logged in [`SESSION_LOG.md`](./SESSION_LOG.md) with session ID, date, and machine.
-> - Status line shows session ID (first 8 chars) + machine tag (MBP/Mini)
-> - Resume any session: `claude --resume <session-id>`
-> - Refresh logs: `bash ~/.claude/log-sessions.sh`
+- Claude project path mangling: `/Users/alice/foo_bar` → `-Users-alice-foo-bar`

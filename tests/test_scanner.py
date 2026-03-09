@@ -57,9 +57,9 @@ class TestProcessScanner:
     def test_scan_returns_process_info_list(self) -> None:
         mock_ps = (
             "  PID  %CPU   ELAPSED COMMAND\n"
-            "12345  21.3     05:30 node /Users/beib/.claude/local/claude\n"
+            "12345  21.3     05:30 node /Users/testuser/.claude/local/claude\n"
         )
-        mock_lsof = "p12345\nf4\nn/Users/beib/projects/agentator\n"
+        mock_lsof = "p12345\nf4\nn/Users/testuser/projects/agentator\n"
 
         scanner = ProcessScanner()
         with (
@@ -91,7 +91,7 @@ class TestProcessScanner:
         """Chrome extension native host should not be detected as Claude."""
         mock_ps = (
             "  PID  %CPU   ELAPSED COMMAND\n"
-            "55555  0.1     10:00 /Users/beib/.claude/local/claude --chrome-native-host\n"
+            "55555  0.1     10:00 /Users/testuser/.claude/local/claude --chrome-native-host\n"
         )
         scanner = ProcessScanner()
         with (
@@ -105,9 +105,9 @@ class TestProcessScanner:
         """Real Claude Code process should be detected."""
         mock_ps = (
             "  PID  %CPU   ELAPSED COMMAND\n"
-            "12345  21.3     05:30 /Users/beib/.claude/local/claude\n"
+            "12345  21.3     05:30 /Users/testuser/.claude/local/claude\n"
         )
-        mock_lsof = "p12345\nn/Users/beib/projects/agentator\n"
+        mock_lsof = "p12345\nn/Users/testuser/projects/agentator\n"
         scanner = ProcessScanner()
         with (
             patch.object(scanner, "_run_ps", return_value=mock_ps),
@@ -164,25 +164,25 @@ class TestParseLsofOutput:
         output = (
             "p12345\n"
             "fcwd\n"
-            "n/Users/beib/projects/agentator\n"
+            "n/Users/testuser/projects/agentator\n"
             "f5\n"
-            "n/Users/beib/.claude/tasks/abc12345-dead-beef-cafe-123456789abc\n"
+            "n/Users/testuser/.claude/tasks/abc12345-dead-beef-cafe-123456789abc\n"
             "f6\n"
-            "n/Users/beib/.claude/tasks/def67890-1234-5678-9abc-def012345678\n"
+            "n/Users/testuser/.claude/tasks/def67890-1234-5678-9abc-def012345678\n"
         )
         scanner = ProcessScanner()
         cwd, uuids = scanner._parse_lsof_output(output)
-        assert cwd == "/Users/beib/projects/agentator"
+        assert cwd == "/Users/testuser/projects/agentator"
         assert uuids == {
             "abc12345-dead-beef-cafe-123456789abc",
             "def67890-1234-5678-9abc-def012345678",
         }
 
     def test_cwd_only_no_uuids(self) -> None:
-        output = "p12345\nfcwd\nn/Users/beib/projects/agentator\n"
+        output = "p12345\nfcwd\nn/Users/testuser/projects/agentator\n"
         scanner = ProcessScanner()
         cwd, uuids = scanner._parse_lsof_output(output)
-        assert cwd == "/Users/beib/projects/agentator"
+        assert cwd == "/Users/testuser/projects/agentator"
         assert uuids == set()
 
     def test_empty_output(self) -> None:
@@ -195,7 +195,7 @@ class TestParseLsofOutput:
         output = (
             "p12345\n"
             "f5\n"
-            "n/Users/beib/.claude/tasks/abc12345-dead-beef-cafe-123456789abc\n"
+            "n/Users/testuser/.claude/tasks/abc12345-dead-beef-cafe-123456789abc\n"
         )
         scanner = ProcessScanner()
         cwd, uuids = scanner._parse_lsof_output(output)
@@ -207,14 +207,14 @@ class TestParseLsofOutput:
         output = (
             "p12345\n"
             "fcwd\n"
-            "n/Users/beib/projects/monitorator\n"
+            "n/Users/testuser/projects/monitorator\n"
             "f7\n"
-            "n/Users/beib/.claude/projects/-Users-beib-projects-monitorator/"
+            "n/Users/testuser/.claude/projects/-Users-testuser-projects-monitorator/"
             "f6890b8c-1486-4835-8c1f-d72fc598354c.jsonl\n"
         )
         scanner = ProcessScanner()
         cwd, uuids = scanner._parse_lsof_output(output)
-        assert cwd == "/Users/beib/projects/monitorator"
+        assert cwd == "/Users/testuser/projects/monitorator"
         assert uuids == {"f6890b8c-1486-4835-8c1f-d72fc598354c"}
 
 
@@ -225,7 +225,7 @@ class TestResolveSessionUuid:
 
         p = tmp_path  # type: ignore[assignment]
         # Simulate ~/.claude/projects/<mangled>/
-        mangled = "-Users-beib-projects-agentator"
+        mangled = "-Users-testuser-projects-agentator"
         proj_dir = p / "projects" / mangled
         proj_dir.mkdir(parents=True)
 
@@ -238,7 +238,7 @@ class TestResolveSessionUuid:
 
         scanner = ProcessScanner()
         result = scanner._resolve_session_uuid(
-            "/Users/beib/projects/agentator",
+            "/Users/testuser/projects/agentator",
             {uuid1, uuid2},
             claude_dir=str(p),
         )
@@ -248,7 +248,7 @@ class TestResolveSessionUuid:
         p = tmp_path  # type: ignore[assignment]
         scanner = ProcessScanner()
         result = scanner._resolve_session_uuid(
-            "/Users/beib/projects/agentator",
+            "/Users/testuser/projects/agentator",
             {"nonexistent-uuid-1234-5678-9abc-def012345678"},
             claude_dir=str(p),
         )

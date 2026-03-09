@@ -109,7 +109,7 @@ class TestStateStore:
         active = SessionState(
             session_id="active",
             cwd="/projects/monitorator",
-            updated_at=time.time() - 7200,
+            updated_at=time.time() - 5000,  # within 2x threshold (7200)
         )
         inactive = SessionState(
             session_id="inactive",
@@ -154,7 +154,7 @@ class TestStateStore:
             session_id="active-thinking",
             cwd="/projects/monitorator",
             status=SessionStatus.THINKING,
-            updated_at=time.time() - 7200,
+            updated_at=time.time() - 5000,  # within 2x threshold (7200)
         )
         store.write(thinking)
         removed = store.cleanup_stale(

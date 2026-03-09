@@ -2,8 +2,27 @@
 name = "monitorator"
 version = "0.1.0"
 description = "TUI dashboard to monitor all active Claude Code sessions"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "bebe-acme"}]
 requires-python = ">=3.11"
+keywords = ["tui", "claude", "monitoring", "terminal", "dashboard", "claude-code"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = ["textual>=1.0.0"]
+
+[project.urls]
+Repository = "https://github.com/bebe-acme/monitorator"
+Issues = "https://github.com/bebe-acme/monitorator/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "textual-dev>=1.0.0"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 
 from textual.widgets import Static
 from textual.message import Message
@@ -15,6 +16,7 @@ from monitorator.tui.formatting import (
     format_activity,
     format_elapsed,
 )
+from monitorator.tui.sprites import get_sprite_color, get_sprite_frame, sprite_index_for_session
 
 # Matches text that starts with an XML-style tag (system/internal messages)
 _XML_TAG_RE = re.compile(r"^\s*<[a-zA-Z][\w-]*[ >/]")
@@ -68,71 +70,6 @@ SESSION_COLORS: tuple[str, ...] = (
     "#ffff66",  # light yellow
 )
 
-# Per-status animations — 5 chars wide, 8 frames each
-# THINKING: Gentle breathing pulse — symmetric wave rises and falls (calm, contemplative)
-_ANIM_THINKING = (
-    "\u2581\u2583\u2585\u2583\u2581",  # ▁▃▅▃▁
-    "\u2582\u2584\u2586\u2584\u2582",  # ▂▄▆▄▂
-    "\u2583\u2585\u2587\u2585\u2583",  # ▃▅▇▅▃
-    "\u2584\u2586\u2588\u2586\u2584",  # ▄▆█▆▄
-    "\u2583\u2585\u2587\u2585\u2583",  # ▃▅▇▅▃
-    "\u2582\u2584\u2586\u2584\u2582",  # ▂▄▆▄▂
-    "\u2581\u2583\u2585\u2583\u2581",  # ▁▃▅▃▁
-    "\u2581\u2582\u2584\u2582\u2581",  # ▁▂▄▂▁
-)
-
-# EXECUTING: Scanner bar with trail — bright block moves left to right (purposeful work)
-_ANIM_EXECUTING = (
-    "\u2588\u2593\u2591\u2591\u2591",  # █▓░░░
-    "\u2591\u2588\u2593\u2591\u2591",  # ░█▓░░
-    "\u2591\u2591\u2588\u2593\u2591",  # ░░█▓░
-    "\u2591\u2591\u2591\u2588\u2593",  # ░░░█▓
-    "\u2591\u2591\u2591\u2591\u2588",  # ░░░░█
-    "\u2591\u2591\u2591\u2588\u2593",  # ░░░█▓
-    "\u2591\u2591\u2588\u2593\u2591",  # ░░█▓░
-    "\u2591\u2588\u2593\u2591\u2591",  # ░█▓░░
-)
-
-# SUBAGENT: Fork from center — pulse splits outward and reconverges (branching processes)
-_ANIM_SUBAGENT = (
-    "\u2581\u2581\u2588\u2581\u2581",  # ▁▁█▁▁
-    "\u2581\u2584\u2588\u2584\u2581",  # ▁▄█▄▁
-    "\u2583\u2586\u2588\u2586\u2583",  # ▃▆█▆▃
-    "\u2586\u2588\u2582\u2588\u2586",  # ▆█▂█▆
-    "\u2588\u2585\u2581\u2585\u2588",  # █▅▁▅█
-    "\u2586\u2583\u2581\u2583\u2586",  # ▆▃▁▃▆
-    "\u2583\u2581\u2581\u2581\u2583",  # ▃▁▁▁▃
-    "\u2581\u2581\u2583\u2581\u2581",  # ▁▁▃▁▁
-)
-
-# PERMISSION: Strobe alert — checkerboard flash + solid blink (urgent attention)
-_ANIM_PERMISSION = (
-    "\u2588\u2591\u2588\u2591\u2588",  # █░█░█
-    "\u2591\u2588\u2591\u2588\u2591",  # ░█░█░
-    "\u2588\u2591\u2588\u2591\u2588",  # █░█░█
-    "\u2591\u2588\u2591\u2588\u2591",  # ░█░█░
-    "\u2588\u2588\u2588\u2588\u2588",  # █████
-    "\u2591\u2591\u2591\u2591\u2591",  # ░░░░░
-    "\u2588\u2588\u2588\u2588\u2588",  # █████
-    "\u2591\u2591\u2591\u2591\u2591",  # ░░░░░
-)
-
-# Map status → animation frames
-_STATUS_ANIMATIONS: dict[SessionStatus, tuple[str, ...]] = {
-    SessionStatus.THINKING: _ANIM_THINKING,
-    SessionStatus.EXECUTING: _ANIM_EXECUTING,
-    SessionStatus.SUBAGENT_RUNNING: _ANIM_SUBAGENT,
-    SessionStatus.WAITING_PERMISSION: _ANIM_PERMISSION,
-}
-
-# Per-status spinner colors
-_SPINNER_COLORS: dict[SessionStatus, str] = {
-    SessionStatus.THINKING: "#00ff66",
-    SessionStatus.EXECUTING: "#00ccff",
-    SessionStatus.SUBAGENT_RUNNING: "#cc66ff",
-    SessionStatus.WAITING_PERMISSION: "#ff3333",
-}
-
 # Active statuses: entire row blinks
 _ACTIVE_BLINK_STATUSES = {
     SessionStatus.THINKING,
@@ -152,11 +89,40 @@ _ACTIVITY_COLORS: dict[SessionStatus, str] = {
 }
 
 
-class SessionRow(Static, can_focus=True):
-    """Session row with rich status-based coloring.
+def _get_term_width() -> int:
+    """Return the current terminal width in columns."""
+    return shutil.get_terminal_size()[0]
 
-    Line 1: idx | icon label | project | branch | activity | cpu | elapsed
-    Line 2: (optional) last user prompt
+
+def get_layout_config(term_width: int | None = None) -> dict[str, object]:
+    """Return responsive layout configuration based on terminal width.
+
+    Breakpoints (usable = term_width - 4 for padding/border):
+      Wide (≥130): all columns
+      Medium (≥112): drop ctx
+      Compact (≥94): drop ctx + branch
+      Narrow (<94): drop ctx + branch + pid, shrink project/activity
+    """
+    tw = term_width if term_width is not None else _get_term_width()
+    usable = tw - 4  # padding + border margin
+
+    if usable >= 134:
+        return {"proj_w": 20, "act_w": 36, "show_branch": True, "show_pid": True, "show_ctx": True}
+    if usable >= 116:
+        return {"proj_w": 18, "act_w": 30, "show_branch": True, "show_pid": True, "show_ctx": False}
+    if usable >= 98:
+        return {"proj_w": 16, "act_w": 26, "show_branch": False, "show_pid": True, "show_ctx": False}
+    return {"proj_w": 14, "act_w": 20, "show_branch": False, "show_pid": False, "show_ctx": False}
+
+
+class SessionRow(Static, can_focus=True):
+    """Session row with sprite character and rich status-based coloring.
+
+    Line 1: sprite_l1 | idx | icon label | project | branch | activity | cpu | elapsed
+    Line 2: sprite_l2 | prompt (or just padding)
+    Line 3: sprite_l3 | padding
+    Line 4: sprite_l4 | padding
+    Line 5: sprite_l5 | padding
     """
 
     class Selected(Message):
@@ -168,6 +134,7 @@ class SessionRow(Static, can_focus=True):
         self.session = session
         self.session_id = session.session_id
         self._row_index: int = 0
+        self._sprite_idx: int = sprite_index_for_session(session.session_id)
         self._anim_frame: int = 0
         self._compact: bool = False
         super().__init__(self._build_content(), markup=True)
@@ -178,14 +145,22 @@ class SessionRow(Static, can_focus=True):
         icon = STATUS_ICONS.get(status, "?")
         label = STATUS_LABELS.get(status, "???")
 
-        project = s.project_name[:20]
+        # Responsive layout
+        layout = get_layout_config()
+        proj_w: int = layout["proj_w"]  # type: ignore[assignment]
+        act_w: int = layout["act_w"]  # type: ignore[assignment]
+        show_branch: bool = layout["show_branch"]  # type: ignore[assignment]
+        show_pid: bool = layout["show_pid"]  # type: ignore[assignment]
+        show_ctx: bool = layout["show_ctx"]  # type: ignore[assignment]
+
+        project = s.project_name[:proj_w]
         branch_raw = (
             s.hook_state.git_branch
             if s.hook_state and s.hook_state.git_branch
             else None
         )
         branch = branch_raw[:10] if branch_raw else "\u2014"
-        activity = format_activity(s)[:36]
+        activity = format_activity(s)[:act_w]
         cpu = (
             f"{s.process_info.cpu_percent:.0f}%"
             if s.process_info
@@ -199,26 +174,23 @@ class SessionRow(Static, can_focus=True):
 
         # Context estimate
         ctx = "-"
-        if s.process_info and s.process_info.session_uuid and s.process_info.cwd:
+        if show_ctx and s.process_info and s.process_info.session_uuid and s.process_info.cwd:
             estimate = get_context_estimate(s.process_info.cwd, s.process_info.session_uuid)
             if estimate:
                 ctx = estimate
 
         idx = self._row_index
         color = STATUS_COLORS.get(status, "#666666")
-        proj_color = SESSION_COLORS[(idx - 1) % len(SESSION_COLORS)] if idx > 0 else SESSION_COLORS[0]
+        # Sprite index is stable per session_id (not row position)
+        proj_color = get_sprite_color(sprite_idx=self._sprite_idx)
         activity_color = _ACTIVITY_COLORS.get(status, "#666666")
 
         pid = str(s.process_info.pid) if s.process_info else "-"
 
-        # Spinner for active sessions — cycles every refresh
-        anim_frames = _STATUS_ANIMATIONS.get(status)
-        if anim_frames:
-            spinner = anim_frames[self._anim_frame % len(anim_frames)]
-            spin_color = _SPINNER_COLORS.get(status, "#00ff66")
-            spinner_markup = f"[bold {spin_color}]{spinner}[/]"
-        else:
-            spinner_markup = "     "  # 5-space placeholder for alignment
+        # Sprite for this session — 5-line character (10x12 grid -> 5 half-block lines)
+        sp1, sp2, sp3, sp4, sp5 = get_sprite_frame(
+            status=status, anim_frame=self._anim_frame, sprite_idx=self._sprite_idx,
+        )
 
         # Build icon+label
         icon_label = f"{icon} {label:<5s}"
@@ -226,23 +198,20 @@ class SessionRow(Static, can_focus=True):
         # Permission: blink on icon+label and activity with warning suffix
         if status == SessionStatus.WAITING_PERMISSION:
             icon_markup = f"[{color} blink]{icon_label}[/]"
-            activity_markup = f"[{activity_color} blink]{activity:<36s} \u26a0\u26a0[/]"
+            activity_markup = f"[{activity_color} blink]{activity:<{act_w}s} \u26a0\u26a0[/]"
         else:
             icon_markup = f"[{color}]{icon_label}[/]"
-            activity_markup = f"[{activity_color}]{activity:<36s}[/]"
+            activity_markup = f"[{activity_color}]{activity:<{act_w}s}[/]"
 
-        # Core columns (shared across all status branches)
-        columns = (
-            f" {spinner_markup}[{color}]{idx:>2}[/]  "
-            f"{icon_markup}  "
-            f"[bold {proj_color}]{project:<20s}[/]  "
-            f"[#3399ff]{branch:<10s}[/]  "
-            f"[#666666]{pid:>6s}[/]  "
-            f"{activity_markup}  "
-            f"[#999999]{cpu:>5s}[/]  "
-            f"[#666666]{elapsed:>7s}[/]  "
-            f"[#888888]{ctx:>6s}[/]"
-        )
+        # Build columns responsively
+        columns = f" {sp1}[{color}]{idx:>2}[/]  {icon_markup}  [bold {proj_color}]{project:<{proj_w}s}[/]  "
+        if show_branch:
+            columns += f"[#3399ff]{branch:<10s}[/]  "
+        if show_pid:
+            columns += f"[#666666]{pid:>6s}[/]  "
+        columns += f"{activity_markup}"
+        if show_ctx:
+            columns += f"  [#888888]{ctx:>6s}[/]"
 
         # Wrap entire row for active (blink) or terminated (dim)
         if status in _ACTIVE_BLINK_STATUSES:
@@ -252,14 +221,24 @@ class SessionRow(Static, can_focus=True):
         else:
             line1 = columns
 
-        # Line 2: session prompt (if available and not in compact mode)
+        # Adaptive prompt length
+        tw = _get_term_width()
+        prompt_max = max(20, tw - 24)  # sprite(12) + pads + └─ + margin
+
+        # Line 2: sprite line 2 + optional prompt
         prompt = None if self._compact else _sanitize_prompt(self._get_prompt())
         if prompt:
-            truncated = prompt[:70]
-            line2 = f"       [#555555]\u2514\u2500[/] [italic #777777]{truncated}[/]"
-            return f"{line1}\n{line2}"
+            truncated = prompt[:prompt_max]
+            line2 = f" {sp2}    [#555555]\u2514\u2500[/] [italic #777777]{truncated}[/]"
+        else:
+            line2 = f" {sp2}[#0a0a0a].[/]"
 
-        return line1
+        # Line 3: sprite + embedded cpu/time data
+        line3 = f" {sp3}    [#555555]{cpu:>5s}[/]  [#444444]{elapsed}[/]"
+        line4 = f" {sp4}[#0a0a0a].[/]"
+        line5 = f" {sp5}[#0a0a0a].[/]"
+
+        return f"{line1}\n{line2}\n{line3}\n{line4}\n{line5}"
 
     def _get_prompt(self) -> str | None:
         """Get session prompt — tries hook data first, then JSONL transcript."""

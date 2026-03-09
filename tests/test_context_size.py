@@ -35,12 +35,12 @@ class TestMangleCwd:
     def test_mangle_cwd(self) -> None:
         from monitorator.context_size import mangle_cwd
 
-        assert mangle_cwd("/Users/beib/project") == "-Users-beib-project"
+        assert mangle_cwd("/Users/testuser/project") == "-Users-testuser-project"
 
     def test_mangle_cwd_with_underscores(self) -> None:
         from monitorator.context_size import mangle_cwd
 
-        assert mangle_cwd("/Users/beib/foo_bar") == "-Users-beib-foo-bar"
+        assert mangle_cwd("/Users/testuser/foo_bar") == "-Users-testuser-foo-bar"
 
 
 class TestGetContextEstimate:
@@ -50,9 +50,9 @@ class TestGetContextEstimate:
 
         p = tmp_path  # type: ignore[assignment]
         # Create directory structure: projects/<mangled>/<uuid>.jsonl
-        cwd = "/Users/beib/myproject"
+        cwd = "/Users/testuser/myproject"
         uuid = "abc12345-dead-beef-cafe-123456789abc"
-        mangled = "-Users-beib-myproject"
+        mangled = "-Users-testuser-myproject"
         project_dir = p / "projects" / mangled
         project_dir.mkdir(parents=True)
         jsonl_file = project_dir / f"{uuid}.jsonl"
@@ -77,9 +77,9 @@ class TestGetContextEstimate:
         _CACHE.clear()
 
         p = tmp_path  # type: ignore[assignment]
-        cwd = "/Users/beib/cached"
+        cwd = "/Users/testuser/cached"
         uuid = "cached-uuid-1234-5678-abcdef012345"
-        mangled = "-Users-beib-cached"
+        mangled = "-Users-testuser-cached"
         project_dir = p / "projects" / mangled
         project_dir.mkdir(parents=True)
         jsonl_file = project_dir / f"{uuid}.jsonl"

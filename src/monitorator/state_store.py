@@ -98,10 +98,23 @@ class StateStore:
         now = time.time()
         removed: list[str] = []
         for state in self.list_all():
-            if active_cwds and state.cwd in active_cwds and state.status != SessionStatus.TERMINATED:
-                continue
             updated = state.updated_at or state.timestamp or 0
-            if now - updated > max_age_seconds:
+            age = now - updated
+
+            if age <= max_age_seconds:
+                continue
+
+            # Don't protect terminated sessions — always clean them up
+            if state.status == SessionStatus.TERMINATED:
                 self.delete(state.session_id)
                 removed.append(state.session_id)
+                continue
+
+            # Protect truly active sessions with active cwds (within 2x threshold)
+            if active_cwds and state.cwd in active_cwds and age < max_age_seconds * 2:
+                continue
+
+            # Everything else older than max_age gets deleted
+            self.delete(state.session_id)
+            removed.append(state.session_id)
         return removed

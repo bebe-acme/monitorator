@@ -10,12 +10,12 @@ class TestMangleCwd:
     def test_basic_path(self) -> None:
         from monitorator.session_prompt import mangle_cwd
 
-        assert mangle_cwd("/Users/beib/playground_beib") == "-Users-beib-playground-beib"
+        assert mangle_cwd("/Users/testuser/playground_testuser") == "-Users-testuser-playground-testuser"
 
     def test_underscores_replaced(self) -> None:
         from monitorator.session_prompt import mangle_cwd
 
-        assert mangle_cwd("/Users/beib/my_project") == "-Users-beib-my-project"
+        assert mangle_cwd("/Users/testuser/my_project") == "-Users-testuser-my-project"
 
     def test_no_leading_slash_doubled(self) -> None:
         from monitorator.session_prompt import mangle_cwd
@@ -30,13 +30,13 @@ class TestFindSessionJsonl:
         from monitorator.session_prompt import find_session_jsonl
 
         p = tmp_path  # type: ignore[assignment]
-        mangled = "-Users-beib-projects-agentator"
+        mangled = "-Users-testuser-projects-agentator"
         proj_dir = p / "projects" / mangled
         proj_dir.mkdir(parents=True)
         uuid = "abc12345-dead-beef-cafe-123456789abc"
         (proj_dir / f"{uuid}.jsonl").write_text("{}\n")
 
-        result = find_session_jsonl("/Users/beib/projects/agentator", uuid, claude_dir=str(p))
+        result = find_session_jsonl("/Users/testuser/projects/agentator", uuid, claude_dir=str(p))
         assert result is not None
         assert result.endswith(f"{uuid}.jsonl")
 

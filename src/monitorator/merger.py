@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections import defaultdict
 
 from monitorator.models import MergedSession, ProcessInfo, SessionState, SessionStatus
 
@@ -28,7 +29,15 @@ class SessionMerger:
         results: list[MergedSession] = []
         matched_process_indices: set[int] = set()
 
-        for state in hook_states:
+        # Sort by recency so active sessions get matched to processes first,
+        # preventing zombie sessions from stealing process matches
+        sorted_states = sorted(
+            hook_states,
+            key=lambda s: s.updated_at or s.timestamp or 0,
+            reverse=True,
+        )
+
+        for state in sorted_states:
             proc = self._find_matching_process(state, processes, matched_process_indices)
             effective_status = state.status
             is_stale = self._check_stale(state, proc, now)
@@ -86,7 +95,42 @@ class SessionMerger:
                 is_stale=is_stale,
             ))
 
-        return results
+        return self._dedup_same_cwd(results)
+
+    @staticmethod
+    def _dedup_same_cwd(results: list[MergedSession]) -> list[MergedSession]:
+        """Deduplicate sessions sharing the same cwd.
+
+        When multiple sessions share a cwd (e.g. after permission prompt restart),
+        keep only the most recently updated one. All others are marked stale.
+        """
+        cwd_groups: dict[str, list[MergedSession]] = defaultdict(list)
+        no_cwd: list[MergedSession] = []
+
+        for r in results:
+            cwd = r.hook_state.cwd if r.hook_state else (r.process_info.cwd if r.process_info else None)
+            if cwd:
+                cwd_groups[cwd.rstrip("/")].append(r)
+            else:
+                no_cwd.append(r)
+
+        deduped: list[MergedSession] = list(no_cwd)
+        for _cwd, sessions in cwd_groups.items():
+            if len(sessions) <= 1:
+                deduped.extend(sessions)
+                continue
+
+            # Sort by recency — keep only the most recently updated session
+            sessions.sort(
+                key=lambda s: (s.hook_state.updated_at or 0) if s.hook_state else 0,
+                reverse=True,
+            )
+            deduped.append(sessions[0])
+            for s in sessions[1:]:
+                s.is_stale = True
+                deduped.append(s)
+
+        return deduped
 
     @staticmethod
     def _cwds_related(cwd_a: str, cwd_b: str) -> bool:
