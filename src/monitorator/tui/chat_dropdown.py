@@ -57,13 +57,17 @@ class ChatDropdown(VerticalScroll):
 
             if role == "user":
                 cls = "user-msg turn-start" if prev_role is not None else "user-msg"
-                safe_oneline = safe.replace("\n", " ")
-                content = f"[bold #6366f1]❯[/] [#eeeeee]{safe_oneline}[/]"
+                safe_oneline = safe.replace("\n", " ").strip()
+                if len(safe_oneline) > 80:
+                    safe_oneline = safe_oneline[:79] + "\u2026"
+                content = f"  [bold #6366f1]you:[/] [#eeeeee]{safe_oneline}[/]"
                 yield ChatMessage(content, markup=True, classes=cls)
 
             elif role == "assistant":
-                safe_indented = safe.replace("\n", "\n  ")
-                content = f"  [#bbbbbb]{safe_indented}[/]"
+                safe_oneline = safe.replace("\n", " ").strip()
+                if len(safe_oneline) > 80:
+                    safe_oneline = safe_oneline[:79] + "\u2026"
+                content = f"  [bold #ffcc00]claude:[/] [#bbbbbb]{safe_oneline}[/]"
                 yield ChatMessage(content, markup=True, classes="assistant-msg")
 
             elif role == "tool":
