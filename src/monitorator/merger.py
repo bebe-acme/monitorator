@@ -44,6 +44,11 @@ class SessionMerger:
             if effective_status in _ACTIVE_STATUSES:
                 self._prev_active_time[state.session_id] = state.updated_at or now
 
+            if proc is not None and effective_status == SessionStatus.WAITING_PERMISSION:
+                # High CPU while "waiting" = permission was granted, work resumed
+                if proc.cpu_percent > CPU_OVERRIDE_THRESHOLD:
+                    effective_status = SessionStatus.THINKING
+
             if proc is not None and effective_status == SessionStatus.IDLE:
                 # Time-based hold: if recently active, keep THINKING to prevent flicker
                 last_active = self._prev_active_time.get(state.session_id, 0)

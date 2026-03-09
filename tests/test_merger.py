@@ -56,8 +56,8 @@ class TestSessionMerger:
         merged = merger.merge(states, processes)
         assert merged[0].effective_status == SessionStatus.THINKING
 
-    def test_no_cpu_override_for_non_idle(self) -> None:
-        """CPU override only applies to idle status."""
+    def test_waiting_permission_overridden_by_high_cpu(self) -> None:
+        """WAITING_PERMISSION + high CPU = permission was granted, override to THINKING."""
         states = [SessionState(
             session_id="no-ov",
             cwd="/tmp/proj",
@@ -65,6 +65,19 @@ class TestSessionMerger:
             updated_at=time.time(),
         )]
         processes = [ProcessInfo(pid=100, cpu_percent=25.0, elapsed_seconds=60, cwd="/tmp/proj", command="claude")]
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        assert merged[0].effective_status == SessionStatus.THINKING
+
+    def test_waiting_permission_stays_with_low_cpu(self) -> None:
+        """WAITING_PERMISSION + low CPU = still actually waiting."""
+        states = [SessionState(
+            session_id="still-waiting",
+            cwd="/tmp/proj",
+            status=SessionStatus.WAITING_PERMISSION,
+            updated_at=time.time(),
+        )]
+        processes = [ProcessInfo(pid=100, cpu_percent=1.0, elapsed_seconds=60, cwd="/tmp/proj", command="claude")]
         merger = SessionMerger()
         merged = merger.merge(states, processes)
         assert merged[0].effective_status == SessionStatus.WAITING_PERMISSION
