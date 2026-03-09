@@ -1,0 +1,4 @@
+zig-out/
+.zig-cache/
+src/root.zig
+build.zig.zon
