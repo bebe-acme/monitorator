@@ -39,7 +39,7 @@ class TestHookInstaller:
         assert len(pre_hooks) == 2
         assert pre_hooks[0]["hooks"][0]["command"] == "existing-hook"
         assert any(
-            "emit_event.py" in h["command"]
+            "emit_event" in h["command"]
             for entry in pre_hooks
             for h in entry.get("hooks", [])
         )
@@ -60,7 +60,7 @@ class TestHookInstaller:
         second = json.loads(tmp_settings_file.read_text())
         # Should not duplicate hooks
         for event_hooks in second.get("hooks", {}).values():
-            monitorator_hooks = [h for h in event_hooks if "emit_event.py" in h.get("command", "")]
+            monitorator_hooks = [h for h in event_hooks if "emit_event" in h.get("command", "")]
             assert len(monitorator_hooks) <= 1
 
     def test_uninstall_removes_hooks(self, tmp_settings_file: Path) -> None:
@@ -70,7 +70,7 @@ class TestHookInstaller:
         settings = json.loads(tmp_settings_file.read_text())
         for event_hooks in settings.get("hooks", {}).values():
             for h in event_hooks:
-                assert "emit_event.py" not in h.get("command", "")
+                assert "emit_event" not in h.get("command", "")
 
     def test_uninstall_preserves_other_hooks(self, tmp_settings_file: Path) -> None:
         tmp_settings_file.write_text(json.dumps({
@@ -111,8 +111,9 @@ class TestHookInstaller:
         some_hooks = list(settings["hooks"].values())[0]
         # New format: hooks are nested under matcher objects
         inner_hooks = some_hooks[0]["hooks"]
-        monitorator_hook = [h for h in inner_hooks if "emit_event.py" in h.get("command", "")][0]
-        assert monitorator_hook["command"].startswith("python3 /")
+        monitorator_hook = [h for h in inner_hooks if "emit_event" in h.get("command", "")][0]
+        # Command is either "python3 /abs/path" or "/abs/path/to/binary"
+        assert monitorator_hook["command"].startswith("/") or monitorator_hook["command"].startswith("python3 /")
 
     def test_install_uses_matcher_format(self, tmp_settings_file: Path) -> None:
         """Hooks must use the new matcher-based format required by Claude Code."""
@@ -153,7 +154,7 @@ class TestHookInstaller:
         assert pre_hooks[0]["hooks"][0]["command"] == "echo done"
         # Ours added
         assert any(
-            "emit_event.py" in h["command"]
+            "emit_event" in h["command"]
             for entry in pre_hooks
             for h in entry.get("hooks", [])
         )
@@ -167,7 +168,7 @@ class TestHookInstaller:
         for event_entries in settings.get("hooks", {}).values():
             for entry in event_entries:
                 for h in entry.get("hooks", []):
-                    assert "emit_event.py" not in h.get("command", "")
+                    assert "emit_event" not in h.get("command", "")
 
     def test_is_installed_detects_matcher_format(self, tmp_settings_file: Path) -> None:
         """is_installed should detect hooks in the new matcher format."""

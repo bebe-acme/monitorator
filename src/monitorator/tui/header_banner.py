@@ -78,7 +78,12 @@ class HeaderBanner(Static):
         """Click anywhere on the header to trigger a refresh."""
         self.post_message(RefreshRequested())
 
-    def update_counts(self, sessions: list[MergedSession]) -> None:
+    def update_counts(
+        self,
+        sessions: list[MergedSession],
+        sort_mode: str = "time",
+        filter_mode: str = "all",
+    ) -> None:
         """Recompute stats from live session list and re-render."""
         counts = count_sessions(sessions)
 
@@ -98,6 +103,12 @@ class HeaderBanner(Static):
             parts.append(
                 f"[bold #ff3333]\u26a0 {counts['waiting']}[/]"
             )
+
+        # Sort/filter indicators (only show non-defaults)
+        if sort_mode != "time":
+            parts.append(f"[#888888]\u2195 {sort_mode}[/]")
+        if filter_mode != "all":
+            parts.append(f"[#cc8800]\u25b6 {filter_mode}[/]")
 
         self._stats_text = "  ".join(parts)
         self._do_render()

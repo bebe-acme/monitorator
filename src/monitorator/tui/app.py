@@ -20,6 +20,7 @@ from monitorator.tui.header_banner import HeaderBanner, RefreshRequested
 from monitorator.tui.column_header import ColumnHeader
 from monitorator.tui.help_screen import HelpScreen
 from monitorator.tui.session_row import SessionRow
+from monitorator.tui.sprites import assign_sprites
 from monitorator.tui.chat_dropdown import ChatDropdown
 from monitorator.tui.detail_panel import DetailPanel
 
@@ -151,7 +152,8 @@ class MonitoratorApp(App[None]):
 
         # Update header + column header for responsive layout
         banner = self.query_one(HeaderBanner)
-        banner.update_counts(merged)
+        sort_mode = self._SORT_MODES[self._sort_mode % len(self._SORT_MODES)]
+        banner.update_counts(merged, sort_mode=sort_mode, filter_mode=filter_mode)
         col_header = self.query_one(ColumnHeader)
         col_header.rebuild()
 
@@ -201,6 +203,12 @@ class MonitoratorApp(App[None]):
         # Re-index all rows
         for i, sid in enumerate(self._cards, start=1):
             self._cards[sid].update_index(i)
+
+        # Anti-collision: assign unique sprites to all visible sessions
+        sprite_map = assign_sprites(list(self._cards.keys()))
+        for sid, sprite_idx in sprite_map.items():
+            if sid in self._cards:
+                self._cards[sid].set_sprite_idx(sprite_idx)
 
         # Apply compact mode to new rows
         for sid in current_ids - existing_ids:

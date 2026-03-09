@@ -414,14 +414,14 @@ SPRITE_PALETTES: list[dict[int, str]] = [
         5: "#787878",  # gray panels
         6: "#383838",  # dark gray
     },
-    # 5: Frog -- animal_green
+    # 5: Frog -- lime_green (distinct from other greens)
     {
         1: "#000000",
-        2: "#00A800",  # green body
-        3: "#58F858",  # light green belly
+        2: "#58F858",  # lime green body
+        3: "#A8FCA8",  # light lime belly
         4: "#FFFFFF",  # white eyes
         5: "#F8D878",  # yellow feet
-        6: "#005800",  # dark green
+        6: "#28A828",  # dark lime
     },
     # 6: Astronaut -- hero_white
     {
@@ -432,14 +432,14 @@ SPRITE_PALETTES: list[dict[int, str]] = [
         5: "#FCA044",  # skin (through visor)
         6: "#787878",  # dark gloves/boots
     },
-    # 7: Slime -- enemy_green
+    # 7: Slime -- emerald (distinct green)
     {
         1: "#000000",
-        2: "#005800",  # dark green body
-        3: "#00A800",  # bright green highlight
+        2: "#00D868",  # emerald body
+        3: "#58F8A8",  # bright emerald highlight
         4: "#FFFFFF",  # white eyes
         5: "#656565",  # mouth
-        6: "#003800",  # darkest green
+        6: "#008840",  # dark emerald
     },
     # 8: Bat -- animal_gray
     {
@@ -459,14 +459,14 @@ SPRITE_PALETTES: list[dict[int, str]] = [
         5: "#F8D878",  # yellow nose
         6: "#442200",  # dark brown tail
     },
-    # 10: Turtle -- animal_green
+    # 10: Turtle -- teal (blue-green)
     {
         1: "#000000",
-        2: "#00A800",  # green shell
-        3: "#58F858",  # light green pattern
+        2: "#00B8A8",  # teal shell
+        3: "#58F8E8",  # light teal pattern
         4: "#FFFFFF",  # white eyes
         5: "#F8D878",  # yellow feet
-        6: "#005800",  # dark green
+        6: "#007868",  # dark teal
     },
     # 11: Duck -- animal_orange
     {
@@ -477,86 +477,86 @@ SPRITE_PALETTES: list[dict[int, str]] = [
         5: "#F8D878",  # yellow feet
         6: "#A84800",  # dark orange tail
     },
-    # 12: Bird -- animal_blue
+    # 12: Bird -- sky_blue (lighter blue)
     {
         1: "#000000",
-        2: "#0078F8",  # blue body
-        3: "#58B8FC",  # light blue breast
+        2: "#58C8F8",  # sky blue body
+        3: "#A8E8FC",  # light sky breast
         4: "#FFFFFF",  # white eyes
         5: "#F8D878",  # yellow beak/feet
-        6: "#0058A8",  # dark blue tail
+        6: "#2898C8",  # dark sky tail
     },
-    # 13: Snake -- animal_green2
+    # 13: Snake -- chartreuse (yellow-green)
     {
         1: "#000000",
-        2: "#00A800",  # green body
-        3: "#58F858",  # light green pattern
+        2: "#A8D800",  # chartreuse body
+        3: "#D8F858",  # light chartreuse pattern
         4: "#FFFFFF",  # white eyes
         5: "#F8D878",  # yellow tongue
-        6: "#005800",  # dark green tail
+        6: "#688800",  # dark chartreuse tail
     },
-    # 14: Spider -- animal_brown2
+    # 14: Spider -- tan (light brown)
     {
         1: "#000000",
-        2: "#884400",  # brown body
-        3: "#FCA044",  # orange markings
+        2: "#D8A060",  # tan body
+        3: "#F8D098",  # light tan markings
         4: "#FFFFFF",  # white eyes
         5: "#F8D878",  # yellow details
-        6: "#442200",  # dark brown legs
+        6: "#986830",  # dark tan legs
     },
-    # 15: Skeleton -- bone_white
+    # 15: Skeleton -- bone (warm white)
     {
         1: "#000000",
-        2: "#F8F8F8",  # white bones
-        3: "#BCBCBC",  # gray shadows
+        2: "#E8D8C0",  # bone white
+        3: "#C8B8A0",  # gray-bone shadows
         4: "#FFFFFF",  # bright highlights
         5: "#FCA044",  # orange details
-        6: "#787878",  # dark gray
+        6: "#A89878",  # dark bone
     },
-    # 16: Zombie -- enemy_green
+    # 16: Zombie -- olive (yellow-brown-green)
     {
         1: "#000000",
-        2: "#005800",  # dark green skin
-        3: "#00A800",  # green highlights
+        2: "#688800",  # olive skin
+        3: "#98B800",  # light olive highlights
         4: "#FFFFFF",  # white eyes
         5: "#656565",  # gray details
-        6: "#003800",  # darkest green
+        6: "#405800",  # dark olive
     },
-    # 17: Spaceship -- robot_blue
+    # 17: Spaceship -- indigo (deep blue)
     {
         1: "#000000",
-        2: "#0078F8",  # blue hull
-        3: "#58B8FC",  # light blue cockpit
+        2: "#3850E0",  # indigo hull
+        3: "#7888F8",  # light indigo cockpit
         4: "#FC0000",  # red engine
-        5: "#0058A8",  # dark blue panels
-        6: "#003878",  # darkest blue
+        5: "#2038A0",  # dark indigo panels
+        6: "#102060",  # darkest indigo
     },
-    # 18: Rabbit -- soft_white
+    # 18: Rabbit -- cream (warm off-white)
     {
         1: "#000000",
-        2: "#F8F8F8",  # white fur
+        2: "#F0E0C0",  # cream fur
         3: "#FC7878",  # pink inner ears
         4: "#FFFFFF",  # bright highlights
-        5: "#BCBCBC",  # gray tail
-        6: "#E8E0D8",  # warm white feet
+        5: "#C8B898",  # warm gray tail
+        6: "#D8C8A8",  # darker cream feet
     },
-    # 19: Mushroom -- item_red
+    # 19: Mushroom -- coral (pink-red)
     {
-        1: "#A80000",  # dark red outline
-        2: "#F83800",  # red cap
-        3: "#FC7878",  # pink spots
+        1: "#A83030",  # dark coral outline
+        2: "#F87070",  # coral cap
+        3: "#FCA8A8",  # light coral spots
         4: "#FFFFFF",  # white spots
         5: "#FCA044",  # orange stem
-        6: "#580000",  # darkest red
+        6: "#983838",  # dark coral
     },
-    # 20: Heart -- item_red2
+    # 20: Heart -- hot_pink
     {
-        1: "#A80000",  # dark red outline
-        2: "#F83800",  # red body
-        3: "#FC7878",  # pink highlight
+        1: "#A82060",  # dark pink outline
+        2: "#F850A8",  # hot pink body
+        3: "#FC98D0",  # light pink highlight
         4: "#FFFFFF",  # white sparkle
         5: "#FCA044",  # orange shadow
-        6: "#580000",  # darkest red
+        6: "#882050",  # dark hot pink
     },
     # 21: Star -- item_gold
     {
@@ -649,6 +649,24 @@ def render_sprite(
 # -- Grid Transforms (for animations) ---------------------------------------
 
 
+def _translate_grid(grid: list[list[int]], dx: int, dy: int) -> list[list[int]]:
+    """Translate entire sprite grid by (dx, dy) pixels, filling gaps with transparent."""
+    result = [row[:] for row in grid]
+    if dx < 0:
+        n = min(-dx, _GRID_COLS)
+        result = [row[n:] + [0] * n for row in result]
+    elif dx > 0:
+        n = min(dx, _GRID_COLS)
+        result = [[0] * n + row[:-n] for row in result]
+    if dy < 0:
+        n = min(-dy, _GRID_ROWS)
+        result = result[n:] + [[0] * _GRID_COLS for _ in range(n)]
+    elif dy > 0:
+        n = min(dy, _GRID_ROWS)
+        result = [[0] * _GRID_COLS for _ in range(n)] + result[:-n]
+    return result
+
+
 def _shift_grid_left(grid: list[list[int]]) -> list[list[int]]:
     """Shift pixel grid left by 1 column; rightmost column becomes transparent."""
     return [row[1:] + [0] for row in grid]
@@ -738,6 +756,14 @@ _BLANK_FRAME: tuple[str, str, str, str, str] = (
 # THINKING walk cycle (8 frames): 4 positions cycled twice
 _THINKING_PHASES: list[int] = [0, 1, 2, 3, 0, 1, 2, 3]
 
+# Full-body walk sequences (dx, dy) per frame
+_THINKING_WALK: list[tuple[int, int]] = [
+    (0, 0), (-2, 0), (0, -1), (2, 0), (0, 0), (-2, 0), (0, -1), (2, 0),
+]
+_EXECUTING_WALK: list[tuple[int, int]] = [
+    (0, 0), (-2, -1), (0, 0), (2, -1), (0, 0), (-2, -1), (0, 0), (2, -1),
+]
+
 # EXECUTING fast walk cycle (8 frames): double-speed walk
 _EXECUTING_PHASES: list[int] = [0, 2, 0, 2, 1, 3, 1, 3]
 
@@ -783,22 +809,22 @@ def get_sprite_frame(
         lines = render_sprite(base_grid, palette)
         return tuple(f"[dim]{line}[/]" for line in lines)  # type: ignore[return-value]
 
-    # -- THINKING: walk cycle --
+    # -- THINKING: full-body walk --
     if status == SessionStatus.THINKING:
-        phase = _THINKING_PHASES[frame]
-        if phase == 0:
+        dx, dy = _THINKING_WALK[frame]
+        if dx == 0 and dy == 0:
             grid = base_grid
         else:
-            grid = _walk_frame(base_grid, phase)
+            grid = _translate_grid(base_grid, dx, dy)
         return render_sprite(grid, palette)
 
-    # -- EXECUTING: walk cycle --
+    # -- EXECUTING: full-body bouncy walk --
     if status == SessionStatus.EXECUTING:
-        phase = _EXECUTING_PHASES[frame]
-        if phase == 0:
+        dx, dy = _EXECUTING_WALK[frame]
+        if dx == 0 and dy == 0:
             grid = base_grid
         else:
-            grid = _walk_frame(base_grid, phase)
+            grid = _translate_grid(base_grid, dx, dy)
         return render_sprite(grid, palette)
 
     # -- SUBAGENT_RUNNING: brightness pulse --
@@ -852,3 +878,29 @@ def sprite_index_for_session(session_id: str) -> int:
     """
     h = int(hashlib.md5(session_id.encode()).hexdigest()[:8], 16)
     return _SESSION_POOL[h % len(_SESSION_POOL)]
+
+
+def assign_sprites(session_ids: list[str]) -> dict[str, int]:
+    """Assign unique sprite indices to sessions, avoiding collisions.
+
+    Uses hash-based assignment with linear probing fallback to guarantee
+    unique sprites when possible (up to len(_SESSION_POOL) sessions).
+    """
+    pool = list(_SESSION_POOL)
+    sorted_ids = sorted(session_ids)
+    assignments: dict[str, int] = {}
+    used: set[int] = set()
+    for sid in sorted_ids:
+        h = int(hashlib.md5(sid.encode()).hexdigest()[:8], 16)
+        base_pos = h % len(pool)
+        assigned = None
+        for offset in range(len(pool)):
+            candidate = pool[(base_pos + offset) % len(pool)]
+            if candidate not in used:
+                assigned = candidate
+                break
+        if assigned is None:
+            assigned = pool[base_pos % len(pool)]
+        assignments[sid] = assigned
+        used.add(assigned)
+    return assignments

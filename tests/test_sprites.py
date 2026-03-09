@@ -848,7 +848,7 @@ class TestIntegration:
             )
 
     def test_executing_fast_walk_has_8_frame_cycle(self) -> None:
-        """EXECUTING fast walk: pattern [0,2,0,2,1,3,1,3] — 2-frame repeats."""
+        """EXECUTING bouncy walk: pattern [(0,0),(-2,-1),(0,0),(2,-1),...] — alternating."""
         from monitorator.tui.sprites import get_sprite_frame
 
         frames = [
@@ -857,8 +857,9 @@ class TestIntegration:
             )
             for f in range(8)
         ]
-        # Fast walk pattern: frames 0==2, 1==3, 4==6, 5==7
-        assert frames[0] == frames[2], "Fast walk frames 0 and 2 should match"
-        assert frames[1] == frames[3], "Fast walk frames 1 and 3 should match"
-        assert frames[4] == frames[6], "Fast walk frames 4 and 6 should match"
-        assert frames[5] == frames[7], "Fast walk frames 5 and 7 should match"
+        # Bouncy walk: frames 0==2==4==6 (base), 1==5 (left+up), 3==7 (right+up)
+        assert frames[0] == frames[2], "Base frames 0 and 2 should match"
+        assert frames[0] == frames[4], "Base frames 0 and 4 should match"
+        assert frames[1] == frames[5], "Left-bob frames 1 and 5 should match"
+        assert frames[3] == frames[7], "Right-bob frames 3 and 7 should match"
+        assert frames[1] != frames[3], "Left-bob and right-bob should differ"
