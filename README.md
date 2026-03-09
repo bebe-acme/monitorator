@@ -72,7 +72,7 @@ Claude Code hooks ──→ ~/.monitorator/sessions/*.json ──┐
 ps + lsof scanning ──→ ProcessInfo[] ──────────────────┘
 ```
 
-1. **Hook** (`hooks/emit_event.py`) — A stdlib-only script registered as a Claude Code hook. Captures events (tool use, prompts, notifications, subagents) and writes session state as JSON.
+1. **Hook** (`hooks/zig/`) — A compiled Zig binary that processes Claude Code events and writes session state as JSON. ~20x faster than the Python fallback (~2.7ms vs ~53ms per invocation). Falls back to `hooks/emit_event.py` (stdlib-only Python) if the binary is not available.
 
 2. **ProcessScanner** — Finds running Claude Code processes via `ps`, resolves their working directory and session UUID via `lsof`.
 
@@ -129,10 +129,26 @@ uv run pytest tests/test_merger.py -k "test_hysteresis"
 - macOS (process scanning uses `ps`/`lsof`; notifications use `osascript`)
 - [uv](https://docs.astral.sh/uv/) for dependency management
 
+### Hook Binary
+
+A pre-built Zig binary is included at `hooks/zig/zig-out/bin/emit_event` for convenience.
+
+> **Security note:** This binary was compiled on a contributor's machine. If you prefer not to trust pre-built binaries, build it yourself:
+>
+> ```bash
+> # Requires Zig 0.15+ (https://ziglang.org/download/)
+> cd hooks/zig
+> zig build -Doptimize=ReleaseFast
+> ```
+>
+> Then re-run `uv run monitorator install` to register the locally-built binary.
+
+The installer automatically prefers the Zig binary and falls back to the Python script (`hooks/emit_event.py`) if it's not found.
+
 ### Key Conventions
 
 - `from __future__ import annotations` in every module
-- `hooks/emit_event.py` must remain stdlib-only and complete in <100ms
+- `hooks/emit_event.py` must remain stdlib-only (Python fallback)
 - Tests use `pytest` with `pytest-asyncio`
 
 ## License
