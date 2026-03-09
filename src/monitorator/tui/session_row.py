@@ -16,7 +16,7 @@ from monitorator.tui.formatting import (
     format_activity,
     format_elapsed,
 )
-from monitorator.tui.sprites import get_sprite_color, get_sprite_frame, sprite_index_for_session
+from monitorator.tui.sprites import get_sprite_color, get_sprite_frame, sprite_index_for_session, assign_sprites
 
 # Matches text that starts with an XML-style tag (system/internal messages)
 _XML_TAG_RE = re.compile(r"^\s*<[a-zA-Z][\w-]*[ >/]")
@@ -80,7 +80,7 @@ _ACTIVE_BLINK_STATUSES = {
 # Activity text color per status
 _ACTIVITY_COLORS: dict[SessionStatus, str] = {
     SessionStatus.THINKING: "#00ff66",
-    SessionStatus.EXECUTING: "#00ff66",
+    SessionStatus.EXECUTING: "#33aaff",
     SessionStatus.SUBAGENT_RUNNING: "#cc66ff",
     SessionStatus.WAITING_PERMISSION: "#ff3333",
     SessionStatus.IDLE: "#cc8800",
@@ -154,14 +154,15 @@ class SessionRow(Static, can_focus=True):
         show_pid: bool = layout["show_pid"]  # type: ignore[assignment]
         show_ctx: bool = layout["show_ctx"]  # type: ignore[assignment]
 
-        project = s.project_name[:proj_w]
+        project = s.project_name[:proj_w - 1] + "\u2026" if len(s.project_name) > proj_w else s.project_name
         branch_raw = (
             s.hook_state.git_branch
             if s.hook_state and s.hook_state.git_branch
             else None
         )
-        branch = branch_raw[:10] if branch_raw else "\u2014"
-        activity = format_activity(s)[:act_w]
+        branch = (branch_raw[:9] + "\u2026") if branch_raw and len(branch_raw) > 10 else (branch_raw or "\u2014")
+        activity_raw = format_activity(s)
+        activity = (activity_raw[:act_w - 1] + "\u2026") if len(activity_raw) > act_w else activity_raw
         cpu = (
             f"{s.process_info.cpu_percent:.0f}%"
             if s.process_info
@@ -205,10 +206,13 @@ class SessionRow(Static, can_focus=True):
         # Build icon+label
         icon_label = f"{icon} {label:<5s}"
 
-        # Permission: blink on icon+label and activity with warning suffix
+        # Blink icon for permission + active statuses; blink activity only for permission
         if status == SessionStatus.WAITING_PERMISSION:
             icon_markup = f"[{color} blink]{icon_label}[/]"
             activity_markup = f"[{activity_color} blink]{activity:<{act_w}s} \u26a0\u26a0[/]"
+        elif status in _ACTIVE_BLINK_STATUSES:
+            icon_markup = f"[{color} blink]{icon_label}[/]"
+            activity_markup = f"[{activity_color}]{activity:<{act_w}s}[/]"
         else:
             icon_markup = f"[{color}]{icon_label}[/]"
             activity_markup = f"[{activity_color}]{activity:<{act_w}s}[/]"
@@ -223,10 +227,8 @@ class SessionRow(Static, can_focus=True):
         if show_ctx:
             columns += f"  [#888888]{ctx:>6s}[/]"
 
-        # Wrap entire row for active (blink) or terminated (dim)
-        if status in _ACTIVE_BLINK_STATUSES:
-            line1 = f"[blink]{columns}[/]"
-        elif status == SessionStatus.TERMINATED:
+        # Dim terminated rows (active blink moved to icon-only above)
+        if status == SessionStatus.TERMINATED:
             line1 = f"[dim]{columns}[/]"
         else:
             line1 = columns
@@ -238,7 +240,7 @@ class SessionRow(Static, can_focus=True):
         # Line 2: sprite line 2 + optional prompt
         prompt = None if self._compact else _sanitize_prompt(self._get_prompt())
         if prompt:
-            truncated = prompt[:prompt_max]
+            truncated = (prompt[:prompt_max - 1] + "\u2026") if len(prompt) > prompt_max else prompt
             line2 = f" {sp2}    [#555555]\u2514\u2500[/] [italic #777777]{truncated}[/]"
         else:
             line2 = f" {sp2}[#0a0a0a].[/]"
@@ -270,6 +272,12 @@ class SessionRow(Static, can_focus=True):
         """Set the row index and refresh display."""
         self._row_index = index
         self.refresh_content()
+
+    def set_sprite_idx(self, idx: int) -> None:
+        """Override the sprite index (used by anti-collision assignment)."""
+        if self._sprite_idx != idx:
+            self._sprite_idx = idx
+            self.refresh_content()
 
     def refresh_content(self) -> None:
         self._anim_frame += 1
