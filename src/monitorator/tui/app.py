@@ -297,6 +297,10 @@ class MonitoratorApp(App[None]):
 
     def _tick_sprites(self) -> None:
         """Fast visual-only refresh: update sprite animation frames + status bar blink."""
+        try:
+            self.query_one(HeaderBanner).tick_eyes()
+        except Exception:
+            pass  # widget not yet mounted (e.g. in unit tests)
         for card in self._cards.values():
             card.refresh_content()
             # Toggle bar-off class for active + permission rows (blink)

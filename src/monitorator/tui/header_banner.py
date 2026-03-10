@@ -17,6 +17,13 @@ _ACTIVE_STATUSES = {
 _GHOST_GRID = SPRITE_TEMPLATES[1]
 _GHOST_PALETTE = {2: "#ffcc00", 3: "#ffffff", 4: "#0a0a0a"}
 
+# Pupil row variants for eye animation (row index 4 of the ghost grid).
+# Each eye is 2px wide (cols 3-4 and 7-8). Pupil (value 4) shifts left↔right.
+_PUPIL_DOWN_LEFT = [0, 2, 2, 4, 3, 2, 2, 4, 3, 2, 2, 0]
+_PUPIL_DOWN_RIGHT = [0, 2, 2, 3, 4, 2, 2, 3, 4, 2, 2, 0]  # default
+_EYE_FRAMES = [_PUPIL_DOWN_RIGHT, _PUPIL_DOWN_LEFT]
+_EYE_TICKS_PER_FRAME = 5  # change eye position every ~1.5s (5 * 0.3s)
+
 _GAP = "  "
 
 
@@ -52,13 +59,24 @@ class HeaderBanner(Static):
     def __init__(self) -> None:
         super().__init__("")
         self._stats_text = ""
+        self._eye_tick: int = 0
+        self._eye_frame: int = 0
         self._do_render()
 
     # CRITICAL: never define _render_content -- it shadows Textual 8 internals.
 
+    def tick_eyes(self) -> None:
+        """Advance the eye animation by one tick (called from app's _tick_sprites)."""
+        self._eye_tick += 1
+        if self._eye_tick % _EYE_TICKS_PER_FRAME == 0:
+            self._eye_frame = (self._eye_frame + 1) % len(_EYE_FRAMES)
+            self._do_render()
+
     def _do_render(self) -> None:
         """Rebuild the Rich markup and push it into the Static widget."""
-        ghost = render_sprite(_GHOST_GRID, _GHOST_PALETTE)
+        grid = list(_GHOST_GRID)
+        grid[4] = _EYE_FRAMES[self._eye_frame]
+        ghost = render_sprite(grid, _GHOST_PALETTE)
 
         if self._stats_text:
             stats_line = self._stats_text
