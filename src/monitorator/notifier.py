@@ -13,13 +13,20 @@ class Notifier:
         self._debounce_seconds = debounce_seconds
         self._last_sent: dict[tuple[str, str], float] = {}
 
-    def _osascript(self, message: str) -> None:
+    def _osascript(self, message: str, sound: str | None = None) -> None:
         script = f'display notification "{message}" with title "Monitorator"'
+        if sound:
+            script += f' sound name "{sound}"'
         subprocess.run(
             ["osascript", "-e", script],
             capture_output=True,
             timeout=5,
         )
+
+    _SOUNDS: dict[str, str] = {
+        "permission": "Glass",
+        "session_finished": "Hero",
+    }
 
     def notify(self, message: str, trigger: str, session_id: str) -> None:
         key = (session_id, trigger)
@@ -32,7 +39,7 @@ class Notifier:
 
         self._last_sent[key] = now
         try:
-            self._osascript(message)
+            self._osascript(message, sound=self._SOUNDS.get(trigger))
         except (OSError, subprocess.TimeoutExpired):
             pass
 

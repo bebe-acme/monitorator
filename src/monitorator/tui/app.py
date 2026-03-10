@@ -121,7 +121,13 @@ class MonitoratorApp(App[None]):
                 if hook_time and now - hook_time > STALE_HOOK_THRESHOLD:
                     m.effective_status = SessionStatus.IDLE
 
-        # Always hide terminated sessions — monitorator shows live sessions only
+        # Check transitions on ALL sessions (including terminated) for notifications
+        all_current = {m.session_id: m for m in merged}
+        previous = self._previous
+        self._notifier.check_transitions(previous, all_current)
+        self._previous = all_current
+
+        # Hide terminated sessions from display
         merged = [m for m in merged if m.effective_status != SessionStatus.TERMINATED]
 
         # Filter based on current mode
@@ -149,9 +155,6 @@ class MonitoratorApp(App[None]):
             )
             self._stable_order = new_sorted + self._stable_order
         self._stable_order = [sid for sid in self._stable_order if sid in current_ids]
-        previous = self._previous
-        self._notifier.check_transitions(previous, current)
-        self._previous = current
 
         # Update header + column header for responsive layout
         banner = self.query_one(HeaderBanner)
