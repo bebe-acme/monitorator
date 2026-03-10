@@ -124,13 +124,14 @@ class TestSessionMerger:
         assert merged[0].effective_status == SessionStatus.TERMINATED
 
     def test_stale_detection_no_process(self) -> None:
-        """No update in 5min + no matching process = stale."""
+        """No update in 5min + no matching process = stale and terminated."""
         old_time = time.time() - 400  # >5 min ago
         states = [SessionState(session_id="stale1", cwd="/tmp/proj", status=SessionStatus.IDLE, updated_at=old_time)]
         processes: list[ProcessInfo] = []
         merger = SessionMerger()
         merged = merger.merge(states, processes)
         assert merged[0].is_stale
+        assert merged[0].effective_status == SessionStatus.TERMINATED
 
     def test_not_stale_with_process(self) -> None:
         old_time = time.time() - 400
@@ -344,6 +345,33 @@ class TestSessionMerger:
         merged = merger.merge(states, processes)
         # Should NOT match — foobar is not a parent/child of foo
         assert len(merged) == 2
+
+    def test_idle_no_process_old_becomes_terminated(self) -> None:
+        """IDLE + no process + age > 120s → TERMINATED (session closed without Stop hook)."""
+        old_time = time.time() - 150  # 150 seconds ago
+        states = [SessionState(
+            session_id="dead-idle",
+            cwd="/tmp/proj",
+            status=SessionStatus.IDLE,
+            updated_at=old_time,
+        )]
+        processes: list[ProcessInfo] = []
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        assert merged[0].effective_status == SessionStatus.TERMINATED
+
+    def test_idle_no_process_fresh_stays_idle(self) -> None:
+        """IDLE + no process + age < 120s → stays IDLE (grace period)."""
+        states = [SessionState(
+            session_id="fresh-idle",
+            cwd="/tmp/proj",
+            status=SessionStatus.IDLE,
+            updated_at=time.time() - 60,  # 60 seconds ago
+        )]
+        processes: list[ProcessInfo] = []
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        assert merged[0].effective_status == SessionStatus.IDLE
 
     def test_multiple_sessions(self) -> None:
         states = [
