@@ -245,8 +245,9 @@ class SessionRow(Static, can_focus=True):
         else:
             line2 = f" {sp2}[#0a0a0a].[/]"
 
-        # Line 3: sprite + embedded cpu/time data
-        line3 = f" {sp3}    [#555555]{cpu:>5s}[/]  [#444444]{elapsed}[/]"
+        # Line 3: sprite + cpu/time + session ID (first 8 chars)
+        sid_short = s.session_id[:8]
+        line3 = f" {sp3}    [#555555]{cpu:>5s}[/]  [#444444]{elapsed}[/]  [#333333]{sid_short}[/]"
         line4 = f" {sp4}[#0a0a0a].[/]"
         line5 = f" {sp5}[#0a0a0a].[/]"
 
