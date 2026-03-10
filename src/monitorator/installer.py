@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -7,6 +8,9 @@ from pathlib import Path
 HOOK_SCRIPT_PY = Path(__file__).parent.parent.parent / "hooks" / "emit_event.py"
 HOOK_BINARY_ZIG = Path(__file__).parent.parent.parent / "hooks" / "zig" / "zig-out" / "bin" / "emit_event"
 MARKER = "emit_event"
+
+_GLOBAL_BIN_DIR = Path.home() / ".monitorator" / "bin"
+_GLOBAL_BINARY = _GLOBAL_BIN_DIR / "emit_event"
 
 HOOK_EVENTS = [
     "PreToolUse",
@@ -20,10 +24,8 @@ HOOK_EVENTS = [
 
 
 def _resolve_hook_command() -> str:
-    """Prefer compiled Zig binary; fall back to Python script."""
-    if HOOK_BINARY_ZIG.exists():
-        return str(HOOK_BINARY_ZIG.resolve())
-    return f"python3 {HOOK_SCRIPT_PY.resolve()}"
+    """Always point at the global installed binary in ~/.monitorator/bin/."""
+    return str(_GLOBAL_BINARY)
 
 
 class HookInstaller:
@@ -68,7 +70,20 @@ class HookInstaller:
             return True
         return False
 
+    @staticmethod
+    def _install_binary() -> None:
+        """Copy the repo's hook binary (or script) to ~/.monitorator/bin/."""
+        source = HOOK_BINARY_ZIG if HOOK_BINARY_ZIG.exists() else HOOK_SCRIPT_PY
+        if not source.exists():
+            return
+        _GLOBAL_BIN_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, _GLOBAL_BINARY)
+        _GLOBAL_BINARY.chmod(0o755)
+
     def install(self) -> None:
+        # Copy binary to global location
+        self._install_binary()
+
         settings = self._read_settings()
 
         # Backup
@@ -118,4 +133,56 @@ class HookInstaller:
                 for entry in event_hooks:
                     if self._entry_has_marker(entry):
                         return True
+        return False
+
+    def _get_installed_command(self) -> str | None:
+        """Return the hook command currently in settings.json, or None."""
+        settings = self._read_settings()
+        hooks = settings.get("hooks")
+        if not isinstance(hooks, dict):
+            return None
+        for event_hooks in hooks.values():
+            if not isinstance(event_hooks, list):
+                continue
+            for entry in event_hooks:
+                if not isinstance(entry, dict):
+                    continue
+                inner = entry.get("hooks")
+                if isinstance(inner, list):
+                    for h in inner:
+                        if isinstance(h, dict) and MARKER in h.get("command", ""):
+                            return h["command"]
+        return None
+
+    @staticmethod
+    def _hash_file(path: Path) -> str | None:
+        """SHA-256 of a file, or None if it doesn't exist."""
+        if not path.exists():
+            return None
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def ensure_up_to_date(self) -> bool:
+        """Check if hooks need updating and re-install if so.
+
+        Compares the repo's source binary against the installed global copy.
+        Also re-installs if the hook command in settings.json is stale or
+        hooks are missing. Returns True if hooks were updated.
+        """
+        source = HOOK_BINARY_ZIG if HOOK_BINARY_ZIG.exists() else HOOK_SCRIPT_PY
+        source_hash = self._hash_file(source)
+        if source_hash is None:
+            return False
+
+        installed_hash = self._hash_file(_GLOBAL_BINARY)
+        installed_cmd = self._get_installed_command()
+        needs_update = (
+            source_hash != installed_hash
+            or installed_cmd != self._hook_command
+            or not self.is_installed()
+        )
+
+        if needs_update:
+            self.install()
+            return True
+
         return False
