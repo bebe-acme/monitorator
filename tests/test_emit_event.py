@@ -86,7 +86,7 @@ class TestEmitEvent:
         data = json.loads((tmp_sessions_dir / "sess-004.json").read_text())
         assert data["status"] == "thinking"
 
-    def test_stop_sets_terminated(self, tmp_sessions_dir: Path) -> None:
+    def test_stop_sets_idle(self, tmp_sessions_dir: Path) -> None:
         run_hook({"type": "SessionStart", "session_id": "sess-005", "cwd": "/tmp"}, tmp_sessions_dir)
         event = {
             "type": "Stop",
@@ -96,6 +96,18 @@ class TestEmitEvent:
         result = run_hook(event, tmp_sessions_dir)
         assert result.returncode == 0
         data = json.loads((tmp_sessions_dir / "sess-005.json").read_text())
+        assert data["status"] == "idle"
+
+    def test_session_end_sets_terminated(self, tmp_sessions_dir: Path) -> None:
+        run_hook({"type": "SessionStart", "session_id": "sess-005b", "cwd": "/tmp"}, tmp_sessions_dir)
+        event = {
+            "type": "SessionEnd",
+            "session_id": "sess-005b",
+            "cwd": "/tmp",
+        }
+        result = run_hook(event, tmp_sessions_dir)
+        assert result.returncode == 0
+        data = json.loads((tmp_sessions_dir / "sess-005b.json").read_text())
         assert data["status"] == "terminated"
 
     def test_notification_with_permission(self, tmp_sessions_dir: Path) -> None:
