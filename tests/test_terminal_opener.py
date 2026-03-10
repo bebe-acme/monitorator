@@ -8,6 +8,8 @@ import pytest
 from monitorator.terminal_opener import (
     _find_terminal_app_for_pid,
     _badge_and_activate,
+    _activate_warp_tab,
+    _warp_tab_cache,
     _APP_BUNDLE_RE,
     open_terminal_for_pid,
 )
@@ -130,6 +132,38 @@ class TestBadgeAndActivate:
             assert _badge_and_activate("Warp", "ttys003") is True
             mock_open.assert_called_once()
             mock_write.assert_called_once_with(5, b"\a")
+
+
+class TestActivateWarpTab:
+    def setup_method(self) -> None:
+        _warp_tab_cache.clear()
+
+    def test_caches_tab_index_on_scan(self) -> None:
+        with patch("monitorator.terminal_opener._warp_scan_tabs", return_value=3) as mock_scan:
+            assert _activate_warp_tab("my-project") is True
+            mock_scan.assert_called_once()
+            assert _warp_tab_cache["my-project"] == 3
+
+    def test_uses_cache_on_second_call(self) -> None:
+        with patch("monitorator.terminal_opener._warp_try_tab", return_value=True) as mock_try, \
+             patch("monitorator.terminal_opener._warp_scan_tabs") as mock_scan:
+            _warp_tab_cache["my-project"] = 2
+            assert _activate_warp_tab("my-project") is True
+            mock_try.assert_called_once_with("my-project", 2)
+            mock_scan.assert_not_called()
+
+    def test_rescans_when_cache_stale(self) -> None:
+        _warp_tab_cache["my-project"] = 2
+        with patch("monitorator.terminal_opener._warp_try_tab", return_value=False), \
+             patch("monitorator.terminal_opener._warp_scan_tabs", return_value=4) as mock_scan:
+            assert _activate_warp_tab("my-project") is True
+            mock_scan.assert_called_once()
+            assert _warp_tab_cache["my-project"] == 4
+
+    def test_returns_false_when_not_found(self) -> None:
+        with patch("monitorator.terminal_opener._warp_scan_tabs", return_value=None):
+            assert _activate_warp_tab("nonexistent") is False
+            assert "nonexistent" not in _warp_tab_cache
 
 
 class TestOpenTerminalForPid:

@@ -25,6 +25,10 @@ _TERMINAL_APPS: dict[str, str] = {
 # e.g. "/Applications/Foo Bar.app/Contents/MacOS/bin" → "Foo Bar"
 _APP_BUNDLE_RE = re.compile(r"/([^/]+)\.app/", re.IGNORECASE)
 
+# Cache: tab_title → last known Warp tab index (1-based).
+# Persists across calls within the same monitorator process.
+_warp_tab_cache: dict[str, int] = {}
+
 
 def _find_terminal_app_for_pid(pid: int) -> str | None:
     """Walk up the process tree from PID to find the owning terminal app.
@@ -121,33 +125,85 @@ def _activate_terminal_tab(tty: str) -> bool:
     return _run_osascript(script)
 
 
-def _activate_warp_tab(tab_title: str) -> bool:
-    """Switch to a Warp tab by cycling through Cmd+1..9 and matching window title.
-
-    Warp doesn't expose tabs via accessibility, but Cmd+number switches tabs
-    and the window title reflects the active tab's OSC-set title. We cycle
-    through tabs until the window title contains the target name.
-    """
-    # Escape double quotes for AppleScript string
-    safe_title = tab_title.replace("\\", "\\\\").replace('"', '\\"')
+def _warp_try_tab(safe_title: str, tab_index: int) -> bool:
+    """Switch to a specific Warp tab index and check if the title matches."""
     script = f'''
         tell application "Warp" to activate
-        delay 0.1
         tell application "System Events"
             tell process "stable"
-                set origTitle to name of window 1
-                repeat with i from 1 to 9
-                    keystroke (i as text) using command down
-                    delay 0.1
-                    set curTitle to name of window 1
-                    if curTitle contains "{safe_title}" then
-                        return true
-                    end if
-                end repeat
+                keystroke "{tab_index}" using command down
+                delay 0.05
+                if name of window 1 contains "{safe_title}" then
+                    return true
+                else
+                    return false
+                end if
             end tell
         end tell
     '''
     return _run_osascript(script)
+
+
+def _warp_scan_tabs(safe_title: str) -> int | None:
+    """Cycle through Warp tabs 1-9 to find the one matching the title.
+
+    Returns the 1-based tab index if found, None otherwise.
+    Uses minimal delay (0.05s) per tab for speed.
+    """
+    script = f'''
+        tell application "Warp" to activate
+        tell application "System Events"
+            tell process "stable"
+                repeat with i from 1 to 9
+                    keystroke (i as text) using command down
+                    delay 0.05
+                    if name of window 1 contains "{safe_title}" then
+                        return i
+                    end if
+                end repeat
+                return 0
+            end tell
+        end tell
+    '''
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            idx = int(result.stdout.strip())
+            return idx if idx > 0 else None
+    except (subprocess.TimeoutExpired, OSError, ValueError):
+        pass
+    return None
+
+
+def _activate_warp_tab(tab_title: str) -> bool:
+    """Switch to a Warp tab by title, using cached index when available.
+
+    First try: cached index from a previous lookup (instant, single keystroke).
+    If cache misses (tab was reordered/closed), fall back to scanning all tabs.
+    Updates cache on success so subsequent calls are instant.
+    """
+    safe_title = tab_title.replace("\\", "\\\\").replace('"', '\\"')
+
+    # Try cached index first — single keystroke, no cycling
+    cached = _warp_tab_cache.get(tab_title)
+    if cached is not None:
+        if _warp_try_tab(safe_title, cached):
+            return True
+        # Cache stale (tabs reordered) — clear and rescan
+        del _warp_tab_cache[tab_title]
+
+    # Full scan — cycles through tabs to find the right one
+    idx = _warp_scan_tabs(safe_title)
+    if idx is not None:
+        _warp_tab_cache[tab_title] = idx
+        return True
+
+    return False
 
 
 def _badge_and_activate(app_name: str, tty: str | None) -> bool:
@@ -176,7 +232,7 @@ def _run_osascript(script: str) -> bool:
             ["osascript", "-e", script],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=10,
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, OSError):
@@ -192,7 +248,7 @@ def open_terminal_for_pid(
 
     Walks the process tree to detect the actual terminal app, then activates
     it. For iTerm2 and Terminal.app, focuses the specific tab by TTY. For
-    Warp, cycles through tabs matching by window title.
+    Warp, uses Cmd+number with cached tab index (falls back to scanning).
     """
     app = _find_terminal_app_for_pid(pid)
     if app is None:
