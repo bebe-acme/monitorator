@@ -19,6 +19,7 @@ from monitorator.state_store import StateStore
 from monitorator.context_size import _format_tokens
 from monitorator.installer import HookInstaller
 from monitorator.notifier import Notifier
+from monitorator.tab_renamer import rename_tabs
 from monitorator.terminal_opener import open_terminal_for_pid
 from monitorator.tui.header_banner import HeaderBanner, RefreshRequested
 from monitorator.tui.column_header import ColumnHeader
@@ -139,6 +140,9 @@ class MonitoratorApp(App[None]):
                     hook_time = m.hook_state.updated_at or m.hook_state.timestamp or 0.0
                 if hook_time and now - hook_time > STALE_HOOK_THRESHOLD:
                     m.effective_status = SessionStatus.IDLE
+
+        # Rename terminal tabs (uses exact CWD matching, not merger's loose match)
+        rename_tabs(processes, merged)
 
         # Check transitions on ALL sessions (including terminated) for notifications
         all_current = {m.session_id: m for m in merged}
