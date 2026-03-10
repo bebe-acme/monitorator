@@ -241,3 +241,34 @@ Footer > .footer--highlight-key {
     text-style: bold;
     margin: 0 1;
 }
+
+
+/* ─── Label Dialog ─── */
+
+LabelScreen {
+    align: center middle;
+}
+
+#label-dialog {
+    width: 60;
+    height: auto;
+    max-height: 9;
+    background: #1a1a1a;
+    border: round #ffcc00;
+    padding: 1 2;
+}
+
+#label-dialog Static {
+    margin: 0 0 1 0;
+}
+
+#label-dialog Input {
+    background: #0a0a0a;
+    border: solid #333300;
+    color: #cccccc;
+    margin: 0 0 1 0;
+}
+
+#label-dialog Input:focus {
+    border: solid #ffcc00;
+}

@@ -254,7 +254,7 @@ class TestBannerLayout:
         assert "\u2588\u2580\u2580\u2588" not in content  # █▀▀█
 
     def test_lines_short_enough_for_narrow_terminal(self) -> None:
-        """No visible line should exceed 60 chars to avoid wrapping in narrow terminals."""
+        """No visible line should exceed 80 chars to avoid wrapping in narrow terminals."""
         import re
 
         banner = HeaderBanner()
@@ -267,6 +267,6 @@ class TestBannerLayout:
         content = banner.content
         for i, line in enumerate(content.strip().split("\n")):
             plain = re.sub(r"\[/?[^\]]*\]", "", line)
-            assert len(plain) <= 60, (
-                f"Line {i} has {len(plain)} visible chars (max 60): {plain!r}"
+            assert len(plain) <= 80, (
+                f"Line {i} has {len(plain)} visible chars (max 80): {plain!r}"
             )

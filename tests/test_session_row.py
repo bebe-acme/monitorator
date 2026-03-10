@@ -19,6 +19,13 @@ def _wide_terminal():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _no_labels():
+    """Disable label loading during tests (unless explicitly patched)."""
+    with patch("monitorator.tui.session_row.get_label", return_value=None):
+        yield
+
+
 def make_merged(
     session_id: str = "test-1",
     project: str = "TestProj",
@@ -70,7 +77,7 @@ def make_merged(
 
 
 class TestSessionRowContent:
-    def test_row_always_has_three_lines(self) -> None:
+    def test_row_always_has_five_lines(self) -> None:
         """SessionRow always renders 5 lines (sprite 5-line layout)."""
         from monitorator.tui.session_row import SessionRow
 
@@ -120,30 +127,30 @@ class TestSessionRowContent:
         content = row._build_content()
         assert "THINK" in content
 
-    def test_contains_cpu(self) -> None:
-        """CPU appears as embedded data on line 3, not as a column on line 1."""
+    def test_contains_cpu_on_line4(self) -> None:
+        """CPU appears on line 4 (index 3)."""
         from monitorator.tui.session_row import SessionRow
 
         session = make_merged(cpu=45.0)
         row = SessionRow(session)
         content = row._build_content()
         lines = content.strip().split("\n")
-        assert "45%" in lines[2]  # line 3 (index 2)
+        assert "45%" in lines[3]  # line 4 (index 3)
         assert "45%" not in lines[0]  # NOT on line 1
 
-    def test_contains_elapsed(self) -> None:
-        """Elapsed time appears as embedded data on line 3, not as a column on line 1."""
+    def test_contains_elapsed_on_line4(self) -> None:
+        """Elapsed time appears on line 4 (index 3)."""
         from monitorator.tui.session_row import SessionRow
 
         session = make_merged(elapsed=323)
         row = SessionRow(session)
         content = row._build_content()
         lines = content.strip().split("\n")
-        assert "5m 23s" in lines[2]  # line 3 (index 2)
+        assert "5m 23s" in lines[3]  # line 4 (index 3)
         assert "5m 23s" not in lines[0]  # NOT on line 1
 
     def test_description_never_empty(self) -> None:
-        """Description column must always have text."""
+        """Row must always produce non-empty content for every status."""
         from monitorator.tui.session_row import SessionRow
 
         for status in SessionStatus:
@@ -194,15 +201,6 @@ class TestSessionRowIndex:
         row = SessionRow(session)
         row.update_index(3)
         assert row._row_index == 3
-
-    def test_index_in_content(self) -> None:
-        from monitorator.tui.session_row import SessionRow
-
-        session = make_merged()
-        row = SessionRow(session)
-        row.update_index(5)
-        content = row._build_content()
-        assert "5" in content
 
 
 class TestSessionRowWidget:
@@ -292,7 +290,7 @@ class TestSessionRowPromptLine:
         lines = content.strip().split("\n")
         assert len(lines) == 5
 
-    def test_no_prompt_still_has_three_lines(self) -> None:
+    def test_no_prompt_still_has_five_lines(self) -> None:
         """Even without prompt, row always has 5 lines (sprite)."""
         from monitorator.tui.session_row import SessionRow
 
@@ -315,7 +313,6 @@ class TestSessionRowPermission:
         row = SessionRow(session)
         content = row._build_content()
         assert "PERM!" in content
-        assert "Permission" in content
 
     def test_executing_shows_exec_label(self) -> None:
         from monitorator.tui.session_row import SessionRow
@@ -324,37 +321,6 @@ class TestSessionRowPermission:
         row = SessionRow(session)
         content = row._build_content()
         assert "EXEC" in content
-
-
-class TestSessionRowPid:
-    def test_pid_shown_in_row(self) -> None:
-        from monitorator.tui.session_row import SessionRow
-
-        session = make_merged(project="PidProj")
-        row = SessionRow(session)
-        content = row._build_content()
-        assert "12345" in content
-
-    def test_pid_dash_when_no_process(self) -> None:
-        from monitorator.tui.session_row import SessionRow
-
-        session = MergedSession(
-            session_id="test",
-            hook_state=SessionState(
-                session_id="test",
-                cwd="/tmp/test",
-                project_name="Test",
-                status=SessionStatus.THINKING,
-                updated_at=time.time(),
-            ),
-            process_info=None,
-            effective_status=SessionStatus.THINKING,
-            is_stale=False,
-        )
-        row = SessionRow(session)
-        content = row._build_content()
-        assert "[#666666]" in content
-        assert "     -" in content or "    -" in content
 
 
 class TestSessionRowSprite:
@@ -370,17 +336,16 @@ class TestSessionRowSprite:
         assert any(ch in block_chars for ch in content)
 
     def test_different_sessions_get_different_sprites(self) -> None:
-        """Row index 1 vs 2 produce different sprite content."""
+        """Different session_ids produce different sprite content."""
         from monitorator.tui.session_row import SessionRow
 
-        session = make_merged(status=SessionStatus.IDLE, prompt=None)
-        row1 = SessionRow(session)
-        row1.update_index(1)
+        session_a = make_merged(session_id="alpha-111", status=SessionStatus.IDLE, prompt=None)
+        session_b = make_merged(session_id="beta-222", status=SessionStatus.IDLE, prompt=None)
+        row1 = SessionRow(session_a)
         row1._anim_frame = 0
         content1 = row1._build_content()
 
-        row2 = SessionRow(session)
-        row2.update_index(2)
+        row2 = SessionRow(session_b)
         row2._anim_frame = 0
         content2 = row2._build_content()
 
@@ -443,8 +408,6 @@ class TestSessionRowSprite:
 
         sprite_a_before = row_a._sprite_idx
         sprite_b_before = row_b._sprite_idx
-        content_a_before = row_a._build_content()
-        content_b_before = row_b._build_content()
 
         # Swap positions (like app sorting would do)
         row_a._anim_frame = 0
@@ -477,7 +440,7 @@ class TestSessionRowSprite:
         content1 = row._build_content()
         assert content0 != content1
 
-    def test_row_has_three_lines_always(self) -> None:
+    def test_row_has_five_lines_always(self) -> None:
         """Every status produces exactly 5 lines."""
         from monitorator.tui.session_row import SessionRow
 
@@ -524,7 +487,6 @@ class TestSessionRowFullRowBlink:
         row = SessionRow(session)
         content = row._build_content()
         assert "blink" in content
-        assert "\u26a0\u26a0" in content
 
 
 class TestSessionRowTerminatedDim:
@@ -570,25 +532,6 @@ class TestSessionRowPaletteColoring:
         expected_color = get_sprite_color(sprite_idx=sprite_index_for_session(session.session_id))
         assert f"bold {expected_color}" in content
         assert "MyProject" in content
-
-
-class TestSessionRowPidPosition:
-    """PID should appear between BRANCH and DESCRIPTION columns."""
-
-    def test_pid_after_branch_before_activity(self) -> None:
-        from monitorator.tui.session_row import SessionRow
-
-        session = make_merged(project="TestProj", branch="main")
-        row = SessionRow(session)
-        row.update_index(1)
-        content = row._build_content()
-        line1 = content.strip().split("\n")[0]
-        main_pos = line1.find("main")
-        pid_pos = line1.find("12345")
-        activity_pos = line1.find("Editing")
-        assert main_pos < pid_pos < activity_pos, (
-            f"Column order wrong: main@{main_pos}, pid@{pid_pos}, activity@{activity_pos}"
-        )
 
 
 class TestSessionRowIdleAmber:
@@ -712,7 +655,7 @@ class TestSessionRowContext:
 
 
 class TestSessionRowCompact:
-    def test_compact_hides_prompt_but_keeps_three_lines(self) -> None:
+    def test_compact_hides_prompt_but_keeps_five_lines(self) -> None:
         """In compact mode, row is still 5 lines but no prompt text."""
         from monitorator.tui.session_row import SessionRow
 
@@ -766,7 +709,6 @@ class TestSessionRowResponsive:
         row.update_index(1)
         content = row._build_content()
         assert "main" in content  # branch visible
-        assert "12345" in content  # pid visible
 
     def test_narrow_hides_branch(self) -> None:
         from monitorator.tui.session_row import SessionRow
@@ -777,16 +719,6 @@ class TestSessionRowResponsive:
             row.update_index(1)
             content = row._build_content()
             assert "feat/ui" not in content
-
-    def test_narrow_hides_pid(self) -> None:
-        from monitorator.tui.session_row import SessionRow
-
-        with patch("monitorator.tui.session_row._get_term_width", return_value=80):
-            session = make_merged()
-            row = SessionRow(session)
-            row.update_index(1)
-            content = row._build_content()
-            assert "12345" not in content
 
     def test_medium_shows_branch_hides_ctx(self) -> None:
         from monitorator.tui.session_row import SessionRow
@@ -803,27 +735,22 @@ class TestSessionRowResponsive:
 
         cfg = get_layout_config(200)
         assert cfg["show_branch"] is True
-        assert cfg["show_pid"] is True
         assert cfg["show_ctx"] is True
-        assert cfg["proj_w"] == 20
-        assert cfg["act_w"] == 36
+        assert cfg["proj_w"] == 22
 
     def test_get_layout_config_narrow(self) -> None:
         from monitorator.tui.session_row import get_layout_config
 
         cfg = get_layout_config(80)
         assert cfg["show_branch"] is False
-        assert cfg["show_pid"] is False
         assert cfg["show_ctx"] is False
         assert cfg["proj_w"] == 14
-        assert cfg["act_w"] == 20
 
     def test_get_layout_config_medium(self) -> None:
         from monitorator.tui.session_row import get_layout_config
 
         cfg = get_layout_config(120)
         assert cfg["show_branch"] is True
-        assert cfg["show_pid"] is True
         assert cfg["show_ctx"] is False
 
     def test_row_always_five_lines_at_any_width(self) -> None:
@@ -944,3 +871,154 @@ class TestSessionRowPermissionRedBar:
             row = SessionRow(session)
             content = row._build_content()
             assert "NEEDS HUMAN INTERVENTION" not in content
+
+
+class TestSessionRowLabels:
+    """User labels appear on line 1 (right side); prompt always visible on line 2."""
+
+    def test_user_label_shown_on_line_1(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(prompt="some prompt")
+        with patch("monitorator.tui.session_row.get_label", return_value="login feature expansion"):
+            row = SessionRow(session)
+            content = row._build_content()
+        assert "login feature expansion" in content
+        lines = content.strip().split("\n")
+        assert "login feature expansion" in lines[0]  # line 1
+
+    def test_label_does_not_replace_prompt(self) -> None:
+        """Both label (line 1) and prompt (line 2) should be visible."""
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(prompt="Build the monitor")
+        with patch("monitorator.tui.session_row.get_label", return_value="my custom label"):
+            row = SessionRow(session)
+            content = row._build_content()
+        lines = content.strip().split("\n")
+        assert "my custom label" in lines[0]  # label on line 1
+        assert "Build the monitor" in lines[1]  # prompt still on line 2
+
+    def test_user_label_uses_label_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(prompt="something")
+        with patch("monitorator.tui.session_row.get_label", return_value="my label"):
+            row = SessionRow(session)
+            content = row._build_content()
+        assert "#aaaaff" in content  # label color
+
+    def test_label_capped_at_30_chars(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        long_label = "A" * 50
+        session = make_merged(prompt="test")
+        with patch("monitorator.tui.session_row.get_label", return_value=long_label):
+            row = SessionRow(session)
+            content = row._build_content()
+        # Should be truncated with ellipsis, not full 50 chars
+        assert long_label not in content
+        assert "A" * 29 in content  # 29 chars + ellipsis
+
+    def test_no_label_shows_prompt_with_status_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.THINKING, prompt="Build things")
+        # _no_labels fixture already patches get_label to return None
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "Build things" in content
+        assert "#00ff66" in content  # thinking bright color for prompt text
+
+
+class TestSessionRowActivityLine:
+    """Line 3 shows latest activity from format_activity()."""
+
+    def test_activity_shown_on_line_3(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(tool="Edit", tool_summary="file_path: src/app.py")
+        row = SessionRow(session)
+        content = row._build_content()
+        lines = content.strip().split("\n")
+        assert "Editing src/app.py" in lines[2]  # line 3
+
+    def test_activity_uses_status_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(
+            status=SessionStatus.EXECUTING,
+            tool="Bash",
+            tool_summary="command: npm test",
+        )
+        row = SessionRow(session)
+        content = row._build_content()
+        lines = content.strip().split("\n")
+        assert "Running: npm test" in lines[2]
+        assert "#777777" in lines[2]  # uniform grey for activity
+
+    def test_compact_hides_activity(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(tool="Edit", tool_summary="file_path: src/app.py")
+        row = SessionRow(session)
+        row.set_compact(True)
+        content = row._build_content()
+        assert "Editing src/app.py" not in content
+
+    def test_thinking_no_tool_shows_thinking_on_line_3(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(
+            status=SessionStatus.THINKING,
+            tool=None,
+            tool_summary=None,
+        )
+        row = SessionRow(session)
+        content = row._build_content()
+        lines = content.strip().split("\n")
+        assert "Thinking..." in lines[2]
+
+
+class TestSessionRowStatusColors:
+    """Status-specific colors should be present in the row content."""
+
+    def test_thinking_has_green_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.THINKING, prompt="test")
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "#00ff66" in content
+
+    def test_executing_has_blue_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.EXECUTING, prompt="test")
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "#3399ff" in content  # STATUS_COLORS for executing
+
+    def test_idle_has_amber_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.IDLE, prompt="test")
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "#ffaa00" in content
+
+    def test_permission_has_red_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.WAITING_PERMISSION, prompt="test")
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "#ff3333" in content
+
+    def test_subagent_has_purple_color(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.SUBAGENT_RUNNING, prompt="test")
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "#cc66ff" in content

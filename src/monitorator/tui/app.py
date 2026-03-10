@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -14,6 +16,7 @@ from monitorator.merger import SessionMerger
 from monitorator.pid_utils import is_pid_alive
 from monitorator.scanner import ProcessScanner
 from monitorator.state_store import StateStore
+from monitorator.context_size import _format_tokens
 from monitorator.installer import HookInstaller
 from monitorator.notifier import Notifier
 from monitorator.terminal_opener import open_terminal_for_pid
@@ -24,6 +27,7 @@ from monitorator.tui.session_row import SessionRow
 from monitorator.tui.sprites import assign_sprites
 from monitorator.tui.chat_dropdown import ChatDropdown
 from monitorator.tui.detail_panel import DetailPanel
+from monitorator.tui.label_screen import LabelScreen
 
 CSS_PATH = Path(__file__).parent / "styles.tcss"
 SESSIONS_DIR = Path.home() / ".monitorator" / "sessions"
@@ -58,6 +62,9 @@ class MonitoratorApp(App[None]):
         Binding("f", "cycle_filter", "Filter", show=False),
         Binding("v", "toggle_compact", "Compact", show=False),
         Binding("c", "copy_cwd", "Copy CWD", show=False),
+        Binding("l", "set_label", "Label", show=False),
+        Binding("x", "kill_session", "Kill Session", show=False),
+        Binding("X", "kill_stale", "Kill Stale", show=False),
         Binding("escape", "close_dropdown", "Close", show=False),
     ]
 
@@ -79,6 +86,9 @@ class MonitoratorApp(App[None]):
         self._sort_mode: int = 0
         self._filter_mode: int = 0
         self._compact: bool = False
+        # Token tracking: accumulates forever (survives session kills/removals)
+        # Maps (cwd, uuid) -> cumulative output_tokens for that session
+        self._token_snapshots: dict[tuple[str, str], int] = {}
 
     def compose(self) -> ComposeResult:
         yield HeaderBanner()
@@ -165,10 +175,16 @@ class MonitoratorApp(App[None]):
             self._stable_order = new_sorted + self._stable_order
         self._stable_order = [sid for sid in self._stable_order if sid in current_ids]
 
+        # Track token usage across all sessions (including terminated/filtered)
+        tokens_since_start = self._update_token_tracking(list(all_current.values()))
+
         # Update header + column header for responsive layout
         banner = self.query_one(HeaderBanner)
         sort_mode = self._SORT_MODES[self._sort_mode % len(self._SORT_MODES)]
-        banner.update_counts(merged, sort_mode=sort_mode, filter_mode=filter_mode)
+        banner.update_counts(
+            merged, sort_mode=sort_mode, filter_mode=filter_mode,
+            tokens_used=tokens_since_start,
+        )
         col_header = self.query_one(ColumnHeader)
         col_header.rebuild()
 
@@ -245,6 +261,35 @@ class MonitoratorApp(App[None]):
                 if sid in self._cards:
                     self._cards[sid].focus()
                 break
+
+    def _update_token_tracking(self, sessions: list[MergedSession]) -> int:
+        """Update token tracking for all sessions. Returns total context tokens.
+
+        Sums context size (input tokens) across all sessions — same metric as the row.
+        Accumulates forever — killed/removed sessions keep their last snapshot.
+        """
+        from monitorator.context_size import _extract_usage_from_tail, _resolve_jsonl
+
+        for s in sessions:
+            cwd = None
+            uuid = None
+            if s.process_info and s.process_info.session_uuid and s.process_info.cwd:
+                cwd = s.process_info.cwd
+                uuid = s.process_info.session_uuid
+            elif s.hook_state and s.hook_state.session_id and s.hook_state.cwd:
+                cwd = s.hook_state.cwd
+                uuid = s.hook_state.session_id
+            if not cwd or not uuid:
+                continue
+
+            jsonl_path = _resolve_jsonl(cwd, uuid)
+            if jsonl_path is None:
+                continue
+            ctx = _extract_usage_from_tail(jsonl_path)
+            if ctx and ctx > 0:
+                self._token_snapshots[(cwd, uuid)] = ctx
+
+        return sum(self._token_snapshots.values())
 
     def _tick_sprites(self) -> None:
         """Fast visual-only refresh: update sprite animation frames + status bar blink."""
@@ -358,6 +403,57 @@ class MonitoratorApp(App[None]):
                     self.notify(f"Copied: {cwd}")
                 except (subprocess.SubprocessError, FileNotFoundError):
                     self.notify("Failed to copy", severity="error")
+
+    def action_set_label(self) -> None:
+        """Open label editor for focused session."""
+        focused = self.focused
+        if isinstance(focused, SessionRow):
+            from monitorator.labels import get_label
+            current = get_label(focused.session_id) or ""
+            self.push_screen(LabelScreen(focused.session_id, current))
+
+    def _kill_pid(self, pid: int) -> bool:
+        """Send SIGTERM to a process. Returns True if signal was sent."""
+        try:
+            os.kill(pid, signal.SIGTERM)
+            return True
+        except (ProcessLookupError, PermissionError, OSError):
+            return False
+
+    def action_kill_session(self) -> None:
+        """Kill the focused session's process."""
+        focused = self.focused
+        if not isinstance(focused, SessionRow):
+            return
+        session = focused.session
+        if not session.process_info:
+            self.notify("No process to kill", severity="warning")
+            return
+        pid = session.process_info.pid
+        if self._kill_pid(pid):
+            self.notify(f"Killed PID {pid} ({session.project_name})")
+            self._refresh()
+        else:
+            self.notify(f"Failed to kill PID {pid}", severity="error")
+
+    def action_kill_stale(self) -> None:
+        """Kill all stale sessions (IDLE + 0% CPU + running > 30 min)."""
+        killed = []
+        for sid, session in self._previous.items():
+            if (
+                session.effective_status == SessionStatus.IDLE
+                and session.process_info
+                and session.process_info.cpu_percent < 1.0
+                and session.process_info.elapsed_seconds > 1800  # 30 min
+            ):
+                pid = session.process_info.pid
+                if self._kill_pid(pid):
+                    killed.append(f"{session.project_name} (PID {pid})")
+        if killed:
+            self.notify(f"Killed {len(killed)} stale: {', '.join(killed)}")
+            self._refresh()
+        else:
+            self.notify("No stale sessions to kill")
 
     def _toggle_dropdown(self, session_id: str, focus: bool = False) -> None:
         """Toggle the chat history dropdown for a session row."""

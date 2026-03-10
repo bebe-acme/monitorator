@@ -193,8 +193,8 @@ class TestShortenPath:
 
 
 class TestSessionRowRendering:
-    def test_process_only_no_idle_text_on_line1(self) -> None:
-        """Process-only session should show 'Process detected' instead of raw 'Idle'."""
+    def test_process_only_shows_project_and_status(self) -> None:
+        """Process-only session should show project name and status badge."""
         session = MergedSession(
             session_id="proc-999",
             hook_state=None,
@@ -207,7 +207,8 @@ class TestSessionRowRendering:
         )
         row = SessionRow(session)
         content = row._build_content()
-        assert "Process" in content or "no hooks" in content
+        assert "myproject" in content
+        assert "WAIT" in content
 
 
 class TestSessionRowWidget:

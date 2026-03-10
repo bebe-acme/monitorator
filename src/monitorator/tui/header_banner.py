@@ -3,6 +3,7 @@ from __future__ import annotations
 from textual.message import Message
 from textual.widgets import Static
 
+from monitorator.context_size import _format_tokens
 from monitorator.models import MergedSession, SessionStatus
 from monitorator.tui.sprites import SPRITE_TEMPLATES, render_sprite
 
@@ -83,6 +84,7 @@ class HeaderBanner(Static):
         sessions: list[MergedSession],
         sort_mode: str = "time",
         filter_mode: str = "all",
+        tokens_used: int = 0,
     ) -> None:
         """Recompute stats from live session list and re-render."""
         counts = count_sessions(sessions)
@@ -103,6 +105,11 @@ class HeaderBanner(Static):
             parts.append(
                 f"[bold #ff3333]\u26a0 {counts['waiting']}[/]"
             )
+
+        # Token usage since TUI start
+        parts.append(
+            f"[#cc66ff]\u2261 {_format_tokens(tokens_used)} tokens[/]"
+        )
 
         # Sort/filter indicators (only show non-defaults)
         if sort_mode != "time":

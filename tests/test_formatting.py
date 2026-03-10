@@ -234,7 +234,8 @@ class TestFormatActivitySpecific:
         )
         assert format_activity(session) == "Awaiting permission"
 
-    def test_idle_with_hook_and_prompt_shows_prompt(self) -> None:
+    def test_idle_with_hook_and_prompt_shows_elapsed(self) -> None:
+        """IDLE activity shows elapsed time, not prompt (prompt has its own line)."""
         from monitorator.tui.formatting import format_activity
 
         session = make_merged(
@@ -244,12 +245,10 @@ class TestFormatActivitySpecific:
             prompt="Implement the auth flow for login",
             updated_at=time.time() - 180,
         )
-        assert format_activity(session) == "Implement the auth flow for login"
+        assert format_activity(session) == "Idle (3m ago)"
 
-    def test_idle_hooked_no_prompt_falls_back_to_jsonl(self) -> None:
-        """Hooked IDLE session without last_prompt_summary should try JSONL prompt."""
-        from unittest.mock import patch
-
+    def test_idle_hooked_no_prompt_shows_elapsed(self) -> None:
+        """IDLE activity shows elapsed time even without prompt."""
         from monitorator.tui.formatting import format_activity
 
         session = make_merged(
@@ -260,9 +259,8 @@ class TestFormatActivitySpecific:
             updated_at=time.time() - 180,
             session_uuid="abc12345-dead-beef-cafe-123456789abc",
         )
-        with patch("monitorator.session_prompt.get_session_prompt", return_value="Fix the login bug"):
-            result = format_activity(session)
-        assert result == "Fix the login bug"
+        result = format_activity(session)
+        assert result == "Idle (3m ago)"
 
     def test_idle_with_time(self) -> None:
         from monitorator.tui.formatting import format_activity
