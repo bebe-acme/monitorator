@@ -14,6 +14,7 @@ from monitorator.merger import SessionMerger
 from monitorator.pid_utils import is_pid_alive
 from monitorator.scanner import ProcessScanner
 from monitorator.state_store import StateStore
+from monitorator.installer import HookInstaller
 from monitorator.notifier import Notifier
 from monitorator.terminal_opener import open_terminal_for_pid
 from monitorator.tui.header_banner import HeaderBanner, RefreshRequested
@@ -87,6 +88,14 @@ class MonitoratorApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Auto-update hooks if binary has changed (e.g. after git pull)
+        installer = HookInstaller()
+        if installer.ensure_up_to_date():
+            self.notify("Hooks updated to latest version")
+        elif not installer.is_installed():
+            installer.install()
+            self.notify("Hooks installed")
+
         self._refresh()
         self.set_interval(POLL_INTERVAL, self._refresh)
         self.set_interval(ANIM_INTERVAL, self._tick_sprites)
