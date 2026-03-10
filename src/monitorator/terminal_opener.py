@@ -1,78 +1,159 @@
 from __future__ import annotations
 
+import re
 import subprocess
 
+# Known terminal keywords (in command path, lowercase) → AppleScript app name.
+# Checked against the full command string so paths like
+# "/Applications/Warp.app/Contents/MacOS/stable" match via "warp".
+_TERMINAL_APPS: dict[str, str] = {
+    "ghostty": "Ghostty",
+    "iterm2": "iTerm2",
+    "iterm": "iTerm2",
+    "/terminal.app/": "Terminal",
+    "warp": "Warp",
+    "kitty": "kitty",
+    "alacritty": "Alacritty",
+    "wezterm": "WezTerm",
+    "hyper": "Hyper",
+    "tabby": "Tabby",
+    "rio": "Rio",
+}
 
-def get_tty_for_pid(pid: int) -> str | None:
-    """Get the TTY device for a given PID via ps."""
+# Pattern to extract app name from a macOS .app bundle path.
+# e.g. "/Applications/Foo Bar.app/Contents/MacOS/bin" → "Foo Bar"
+_APP_BUNDLE_RE = re.compile(r"/([^/]+)\.app/", re.IGNORECASE)
+
+
+def _find_terminal_app_for_pid(pid: int) -> str | None:
+    """Walk up the process tree from PID to find the owning terminal app.
+
+    First checks against known terminal names. If none match, falls back to
+    extracting the app name from any macOS .app bundle path in an ancestor's
+    command — this handles terminals we don't explicitly list.
+    """
+    current = pid
+    ancestors: list[str] = []  # collected for fallback
+
+    for _ in range(10):
+        try:
+            result = subprocess.run(
+                ["ps", "-o", "ppid=", "-p", str(current)],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            ppid_str = result.stdout.strip()
+            if not ppid_str:
+                break
+            ppid = int(ppid_str)
+            if ppid <= 1:
+                break
+
+            result = subprocess.run(
+                ["ps", "-o", "command=", "-p", str(ppid)],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            command = result.stdout.strip()
+            command_lower = command.lower()
+            ancestors.append(command)
+
+            # Check known terminals
+            for key, app_name in _TERMINAL_APPS.items():
+                if key in command_lower:
+                    return app_name
+
+            current = ppid
+        except (ValueError, subprocess.TimeoutExpired, OSError):
+            break
+
+    # Fallback: find any .app bundle in ancestor commands
+    for cmd in ancestors:
+        match = _APP_BUNDLE_RE.search(cmd)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def _activate_iterm2_tab(tty: str) -> bool:
+    """Focus the specific iTerm2 tab containing the given TTY."""
+    script = f'''
+        tell application "iTerm2"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    repeat with s in sessions of t
+                        if tty of s is "/dev/{tty}" then
+                            select t
+                            set index of w to 1
+                            activate
+                            return true
+                        end if
+                    end repeat
+                end repeat
+            end repeat
+            activate
+        end tell
+    '''
+    return _run_osascript(script)
+
+
+def _activate_terminal_tab(tty: str) -> bool:
+    """Focus the specific Terminal.app tab containing the given TTY."""
+    script = f'''
+        tell application "Terminal"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    if tty of t is "/dev/{tty}" then
+                        set selected tab of w to t
+                        set index of w to 1
+                        activate
+                        return true
+                    end if
+                end repeat
+            end repeat
+            activate
+        end tell
+    '''
+    return _run_osascript(script)
+
+
+def _activate_app(app_name: str) -> bool:
+    """Activate a terminal app (brings to front)."""
+    return _run_osascript(f'tell application "{app_name}" to activate')
+
+
+def _run_osascript(script: str) -> bool:
+    """Run an AppleScript and return whether it succeeded."""
     try:
         result = subprocess.run(
-            ["ps", "-o", "tty=", "-p", str(pid)],
+            ["osascript", "-e", script],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        if result.returncode != 0:
-            return None
-        tty = result.stdout.strip()
-        if not tty or tty == "?":
-            return None
-        return tty
+        return result.returncode == 0
     except (subprocess.TimeoutExpired, OSError):
-        return None
+        return False
 
 
-_ACTIVATE_SCRIPTS: list[tuple[str, str]] = [
-    (
-        "Ghostty",
-        """
-        tell application "Ghostty"
-            activate
-        end tell
-        """,
-    ),
-    (
-        "iTerm",
-        """
-        tell application "iTerm2"
-            activate
-        end tell
-        """,
-    ),
-    (
-        "Terminal",
-        """
-        tell application "Terminal"
-            activate
-        end tell
-        """,
-    ),
-]
+def open_terminal_for_pid(pid: int, tty: str | None = None) -> bool:
+    """Find and activate the terminal window for a Claude Code process.
 
-
-def activate_terminal_for_tty(tty: str) -> bool:
-    """Try to activate the terminal app window containing the given TTY.
-
-    Tries Ghostty first, then iTerm2, then Terminal.app.
+    Walks the process tree to detect the actual terminal app, then activates
+    it. For iTerm2 and Terminal.app, focuses the specific tab by TTY.
     """
-    try:
-        for _name, script in _ACTIVATE_SCRIPTS:
-            result = subprocess.run(
-                ["osascript", "-e", script],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                return True
-        return False
-    except (subprocess.TimeoutExpired, OSError):
+    app = _find_terminal_app_for_pid(pid)
+    if app is None:
         return False
 
+    # Terminals that support tab-level focusing via AppleScript
+    if tty:
+        if app == "iTerm2":
+            return _activate_iterm2_tab(tty)
+        if app == "Terminal":
+            return _activate_terminal_tab(tty)
 
-def open_terminal_for_pid(pid: int) -> bool:
-    """Find and activate the terminal window for a Claude Code process."""
-    tty = get_tty_for_pid(pid)
-    if tty is None:
-        return False
-    return activate_terminal_for_tty(tty)
+    return _activate_app(app)
