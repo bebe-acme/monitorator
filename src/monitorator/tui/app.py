@@ -121,6 +121,9 @@ class MonitoratorApp(App[None]):
                 if hook_time and now - hook_time > STALE_HOOK_THRESHOLD:
                     m.effective_status = SessionStatus.IDLE
 
+        # Always hide terminated sessions — monitorator shows live sessions only
+        merged = [m for m in merged if m.effective_status != SessionStatus.TERMINATED]
+
         # Filter based on current mode
         filter_mode = self._FILTER_MODES[self._filter_mode % len(self._FILTER_MODES)]
         if filter_mode == "active":
