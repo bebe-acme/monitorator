@@ -104,7 +104,9 @@ fn run(alloc: mem.Allocator) !void {
         }
     } else if (mem.eql(u8, event_type, "PostToolUse")) {
         try putStr(&state, "status", "thinking");
-    } else if (mem.eql(u8, event_type, "Stop") or mem.eql(u8, event_type, "SessionEnd")) {
+    } else if (mem.eql(u8, event_type, "Stop")) {
+        try putStr(&state, "status", "idle");
+    } else if (mem.eql(u8, event_type, "SessionEnd")) {
         try putStr(&state, "status", "terminated");
     } else if (mem.eql(u8, event_type, "Notification")) {
         const notification_type = getStr(event, "notification_type") orelse "";

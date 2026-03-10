@@ -163,7 +163,10 @@ def main() -> None:
     elif event_type == "PostToolUse":
         state["status"] = "thinking"
 
-    elif event_type in ("Stop", "SessionEnd"):
+    elif event_type == "Stop":
+        state["status"] = "idle"
+
+    elif event_type == "SessionEnd":
         state["status"] = "terminated"
 
     elif event_type == "Notification":
