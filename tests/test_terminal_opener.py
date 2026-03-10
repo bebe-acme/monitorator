@@ -133,12 +133,19 @@ class TestBadgeAndActivate:
 
 
 class TestOpenTerminalForPid:
-    def test_opens_warp(self) -> None:
+    def test_opens_warp_with_tab_title(self) -> None:
         with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="Warp"), \
-             patch("monitorator.terminal_opener._badge_and_activate", return_value=True) as mock_activate:
+             patch("monitorator.terminal_opener._activate_warp_tab", return_value=True) as mock_warp:
+            result = open_terminal_for_pid(12345, tty="ttys003", tab_title="my-project")
+            assert result is True
+            mock_warp.assert_called_once_with("my-project")
+
+    def test_opens_warp_fallback_without_title(self) -> None:
+        with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="Warp"), \
+             patch("monitorator.terminal_opener._badge_and_activate", return_value=True) as mock_badge:
             result = open_terminal_for_pid(12345, tty="ttys003")
             assert result is True
-            mock_activate.assert_called_once_with("Warp", "ttys003")
+            mock_badge.assert_called_once_with("Warp", "ttys003")
 
     def test_opens_iterm2_with_tab_focus(self) -> None:
         with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="iTerm2"), \

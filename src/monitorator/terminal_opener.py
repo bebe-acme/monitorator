@@ -121,10 +121,39 @@ def _activate_terminal_tab(tty: str) -> bool:
     return _run_osascript(script)
 
 
+def _activate_warp_tab(tab_title: str) -> bool:
+    """Switch to a Warp tab by cycling through Cmd+1..9 and matching window title.
+
+    Warp doesn't expose tabs via accessibility, but Cmd+number switches tabs
+    and the window title reflects the active tab's OSC-set title. We cycle
+    through tabs until the window title contains the target name.
+    """
+    # Escape double quotes for AppleScript string
+    safe_title = tab_title.replace("\\", "\\\\").replace('"', '\\"')
+    script = f'''
+        tell application "Warp" to activate
+        delay 0.1
+        tell application "System Events"
+            tell process "stable"
+                set origTitle to name of window 1
+                repeat with i from 1 to 9
+                    keystroke (i as text) using command down
+                    delay 0.1
+                    set curTitle to name of window 1
+                    if curTitle contains "{safe_title}" then
+                        return true
+                    end if
+                end repeat
+            end tell
+        end tell
+    '''
+    return _run_osascript(script)
+
+
 def _badge_and_activate(app_name: str, tty: str | None) -> bool:
     """Ring the bell on the TTY to badge the tab, then activate the app.
 
-    Used for terminals that don't expose tab-level APIs (Warp, Ghostty,
+    Fallback for terminals that don't expose tab-level APIs (Ghostty,
     kitty, etc.). The bell causes most terminals to highlight/badge the
     tab so the user can find it.
     """
@@ -154,22 +183,29 @@ def _run_osascript(script: str) -> bool:
         return False
 
 
-def open_terminal_for_pid(pid: int, tty: str | None = None) -> bool:
+def open_terminal_for_pid(
+    pid: int,
+    tty: str | None = None,
+    tab_title: str | None = None,
+) -> bool:
     """Find and activate the terminal window for a Claude Code process.
 
     Walks the process tree to detect the actual terminal app, then activates
-    it. For iTerm2 and Terminal.app, focuses the specific tab by TTY.
+    it. For iTerm2 and Terminal.app, focuses the specific tab by TTY. For
+    Warp, cycles through tabs matching by window title.
     """
     app = _find_terminal_app_for_pid(pid)
     if app is None:
         return False
 
-    # Terminals that support tab-level focusing via AppleScript
+    # Terminals that support tab-level focusing
     if tty:
         if app == "iTerm2":
             return _activate_iterm2_tab(tty)
         if app == "Terminal":
             return _activate_terminal_tab(tty)
+    if app == "Warp" and tab_title:
+        return _activate_warp_tab(tab_title)
 
-    # For all other terminals: bell to badge the tab + activate
+    # Fallback: bell to badge the tab + activate
     return _badge_and_activate(app, tty)
