@@ -10,6 +10,7 @@ CPU_OVERRIDE_THRESHOLD = 10.0  # percent — CPU must exceed this to go IDLE→T
 CPU_DROP_THRESHOLD = 3.0  # percent — CPU must drop below this to go THINKING→IDLE
 STATUS_HOLD_SECONDS = 15.0  # seconds — hold active status to prevent flicker
 ACTIVE_NO_PROCESS_TIMEOUT = 60.0  # seconds — terminate active sessions with no process
+IDLE_NO_PROCESS_TIMEOUT = 120.0  # seconds — terminate idle sessions with no process
 
 _ACTIVE_STATUSES = {SessionStatus.THINKING, SessionStatus.EXECUTING, SessionStatus.SUBAGENT_RUNNING}
 _ALL_ACTIVE_STATUSES = _ACTIVE_STATUSES | {SessionStatus.WAITING_PERMISSION}
@@ -46,6 +47,12 @@ class SessionMerger:
             if proc is None and effective_status in _ALL_ACTIVE_STATUSES:
                 age = now - (state.updated_at or state.timestamp or 0)
                 if age > ACTIVE_NO_PROCESS_TIMEOUT:
+                    effective_status = SessionStatus.TERMINATED
+
+            # No matching process + idle status + old enough → session is dead
+            if proc is None and effective_status == SessionStatus.IDLE:
+                age = now - (state.updated_at or state.timestamp or 0)
+                if age > IDLE_NO_PROCESS_TIMEOUT:
                     effective_status = SessionStatus.TERMINATED
 
             # Track when session was last in an active state
