@@ -837,3 +837,110 @@ class TestSessionRowResponsive:
                 content = row._build_content()
                 lines = content.strip().split("\n")
                 assert len(lines) == 5, f"Width {width} produced {len(lines)} lines"
+
+
+class TestSessionRowStatusBar:
+    """Status bar: left border indicator based on session status."""
+
+    def test_thinking_has_status_active_class(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.THINKING)
+        row = SessionRow(session)
+        assert row.has_class("status-active")
+
+    def test_executing_has_status_active_class(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.EXECUTING)
+        row = SessionRow(session)
+        assert row.has_class("status-active")
+
+    def test_subagent_has_status_active_class(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.SUBAGENT_RUNNING)
+        row = SessionRow(session)
+        assert row.has_class("status-active")
+
+    def test_permission_has_status_permission_class(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.WAITING_PERMISSION)
+        row = SessionRow(session)
+        assert row.has_class("status-permission")
+
+    def test_idle_has_status_idle_class(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.IDLE)
+        row = SessionRow(session)
+        assert row.has_class("status-idle")
+
+    def test_active_does_not_have_idle_class(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.THINKING)
+        row = SessionRow(session)
+        assert not row.has_class("status-idle")
+        assert not row.has_class("status-permission")
+
+    def test_status_class_updates_on_session_change(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session1 = make_merged(session_id="abc", status=SessionStatus.THINKING)
+        row = SessionRow(session1)
+        assert row.has_class("status-active")
+
+        session2 = make_merged(session_id="abc", status=SessionStatus.IDLE)
+        row.update_session(session2)
+        assert row.has_class("status-idle")
+        assert not row.has_class("status-active")
+
+    def test_terminated_has_no_status_bar_class(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.TERMINATED)
+        row = SessionRow(session)
+        assert not row.has_class("status-active")
+        assert not row.has_class("status-permission")
+        assert not row.has_class("status-idle")
+
+
+class TestSessionRowPermissionRedBar:
+    """WAITING_PERMISSION: red blinking bar + 'NEEDS HUMAN INTERVENTION' banner."""
+
+    def test_permission_has_red_bar_class(self) -> None:
+        """WAITING_PERMISSION should use status-permission class (red border via CSS)."""
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.WAITING_PERMISSION)
+        row = SessionRow(session)
+        assert row.has_class("status-permission")
+
+    def test_permission_content_has_human_intervention_text(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.WAITING_PERMISSION)
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "NEEDS HUMAN INTERVENTION" in content
+
+    def test_human_intervention_text_blinks(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(status=SessionStatus.WAITING_PERMISSION)
+        row = SessionRow(session)
+        content = row._build_content()
+        # The intervention text should have blink markup
+        assert "blink" in content
+        assert "NEEDS HUMAN INTERVENTION" in content
+
+    def test_non_permission_has_no_intervention_text(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        for status in [SessionStatus.THINKING, SessionStatus.IDLE, SessionStatus.EXECUTING]:
+            session = make_merged(status=status, prompt=None)
+            row = SessionRow(session)
+            content = row._build_content()
+            assert "NEEDS HUMAN INTERVENTION" not in content

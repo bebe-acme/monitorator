@@ -235,9 +235,12 @@ class MonitoratorApp(App[None]):
                 break
 
     def _tick_sprites(self) -> None:
-        """Fast visual-only refresh: update sprite animation frames without I/O."""
+        """Fast visual-only refresh: update sprite animation frames + status bar blink."""
         for card in self._cards.values():
             card.refresh_content()
+            # Toggle bar-off class for active + permission rows (blink)
+            if card.has_class("status-active") or card.has_class("status-permission"):
+                card.toggle_class("bar-off")
 
     def on_refresh_requested(self, message: RefreshRequested) -> None:
         """Handle click-to-refresh from HeaderBanner."""

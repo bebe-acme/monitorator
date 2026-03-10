@@ -70,11 +70,22 @@ SESSION_COLORS: tuple[str, ...] = (
     "#ffff66",  # light yellow
 )
 
-# Active statuses: entire row blinks
+# Active statuses: entire row blinks + green status bar
 _ACTIVE_BLINK_STATUSES = {
     SessionStatus.THINKING,
     SessionStatus.EXECUTING,
     SessionStatus.SUBAGENT_RUNNING,
+}
+
+# Status bar CSS classes
+_STATUS_BAR_CLASSES = ("status-active", "status-permission", "status-idle")
+
+_STATUS_TO_BAR_CLASS: dict[SessionStatus, str] = {
+    SessionStatus.THINKING: "status-active",
+    SessionStatus.EXECUTING: "status-active",
+    SessionStatus.SUBAGENT_RUNNING: "status-active",
+    SessionStatus.WAITING_PERMISSION: "status-permission",
+    SessionStatus.IDLE: "status-idle",
 }
 
 # Activity text color per status
@@ -138,7 +149,7 @@ class SessionRow(Static, can_focus=True):
         self._anim_frame: int = 0
         self._compact: bool = False
         super().__init__(self._build_content(), markup=True)
-        self._sync_needs_input()
+        self._sync_status_classes()
 
     def _build_content(self) -> str:
         s = self.session
@@ -248,7 +259,10 @@ class SessionRow(Static, can_focus=True):
         # Line 3: sprite + cpu/time + session ID (first 8 chars)
         sid_short = s.session_id[:8]
         line3 = f" {sp3}    [#555555]{cpu:>5s}[/]  [#444444]{elapsed}[/]  [#333333]{sid_short}[/]"
-        line4 = f" {sp4}[#0a0a0a].[/]"
+        if status == SessionStatus.WAITING_PERMISSION:
+            line4 = f" {sp4}    [bold #ff3333 blink]\u26a0 NEEDS HUMAN INTERVENTION[/]"
+        else:
+            line4 = f" {sp4}[#0a0a0a].[/]"
         line5 = f" {sp5}[#0a0a0a].[/]"
 
         return f"{line1}\n{line2}\n{line3}\n{line4}\n{line5}"
@@ -284,17 +298,26 @@ class SessionRow(Static, can_focus=True):
         self._anim_frame += 1
         self.update(self._build_content())
 
-    def _sync_needs_input(self) -> None:
-        """Add or remove the needs-input CSS class based on session status."""
-        if self.session.effective_status == SessionStatus.WAITING_PERMISSION:
+    def _sync_status_classes(self) -> None:
+        """Sync CSS classes based on session status (needs-input + status bar)."""
+        status = self.session.effective_status
+        if status == SessionStatus.WAITING_PERMISSION:
             self.add_class("needs-input")
         else:
             self.remove_class("needs-input")
 
+        # Status bar class
+        target_class = _STATUS_TO_BAR_CLASS.get(status)
+        for cls in _STATUS_BAR_CLASSES:
+            if cls == target_class:
+                self.add_class(cls)
+            else:
+                self.remove_class(cls)
+
     def update_session(self, session: MergedSession) -> None:
         """Update row with new session data without recreating widget."""
         self.session = session
-        self._sync_needs_input()
+        self._sync_status_classes()
         self.refresh_content()
 
     def on_click(self) -> None:

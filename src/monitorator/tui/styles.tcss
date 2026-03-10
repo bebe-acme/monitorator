@@ -85,17 +85,57 @@ SessionRow:hover {
 SessionRow:focus {
     background: #1a1a00;
     color: #ffffff;
+}
+
+SessionRow.status-active:focus {
+    border-left: thick #00ff66;
+}
+
+SessionRow.status-active.bar-off:focus {
+    border-left: thick #1a1a00;
+}
+
+SessionRow.status-permission:focus {
+    border-left: thick #ff3333;
+}
+
+SessionRow.status-permission.bar-off:focus {
+    border-left: thick #1a0505;
+}
+
+SessionRow.status-idle:focus {
     border-left: thick #ffcc00;
+}
+
+/* ─── Status bar (left border indicator) ─── */
+
+SessionRow.status-active {
+    border-left: thick #00ff66;
+}
+
+SessionRow.status-active.bar-off {
+    border-left: thick #0a0a0a;
+}
+
+SessionRow.status-permission {
+    background: #1a0505;
+    border-left: thick #ff3333;
+}
+
+SessionRow.status-permission.bar-off {
+    border-left: thick #0a0a0a;
+}
+
+SessionRow.status-idle {
+    border-left: thick #1a1a1a;
 }
 
 SessionRow.needs-input {
     background: #1a0505;
-    border-left: thick #ff3333;
 }
 
 SessionRow.needs-input:focus {
     background: #1a0505;
-    border-left: thick #ff3333;
 }
 
 
