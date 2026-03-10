@@ -1,208 +1,120 @@
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 import subprocess
 
 import pytest
 
 from monitorator.terminal_opener import (
-    _find_terminal_app_for_pid,
-    _badge_and_activate,
-    _activate_warp_tab,
-    _warp_tab_cache,
-    _APP_BUNDLE_RE,
+    get_tty_for_pid,
+    activate_terminal_for_tty,
     open_terminal_for_pid,
 )
 
 
-def _mock_ps_chain(chain: list[tuple[int, str]]):
-    """Build side_effect for ps calls that walk up a process tree.
-
-    chain: [(ppid, command), ...] — each entry is one ancestor.
-    Two subprocess.run calls per ancestor (ppid lookup, then command lookup).
-    """
-    effects = []
-    for ppid, command in chain:
-        effects.append(MagicMock(returncode=0, stdout=f"  {ppid}\n"))
-        effects.append(MagicMock(returncode=0, stdout=f"{command}\n"))
-    return effects
-
-
-class TestFindTerminalApp:
-    def test_finds_warp_via_app_path(self) -> None:
+class TestGetTtyForPid:
+    def test_returns_tty_string(self) -> None:
         with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = _mock_ps_chain([
-                (100, "/Users/me/.claude/local/claude"),
-                (50, "-zsh"),
-                (10, "/Applications/Warp.app/Contents/MacOS/stable"),
-            ])
-            result = _find_terminal_app_for_pid(12345)
-            assert result == "Warp"
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="ttys003\n"
+            )
+            result = get_tty_for_pid(12345)
+            assert result == "ttys003"
+            mock_run.assert_called_once_with(
+                ["ps", "-o", "tty=", "-p", "12345"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
 
-    def test_finds_ghostty(self) -> None:
+    def test_returns_none_on_failure(self) -> None:
         with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = _mock_ps_chain([
-                (100, "-zsh"),
-                (10, "/Applications/Ghostty.app/Contents/MacOS/ghostty"),
-            ])
-            result = _find_terminal_app_for_pid(12345)
-            assert result == "Ghostty"
-
-    def test_finds_iterm2(self) -> None:
-        with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = _mock_ps_chain([
-                (100, "login -fp user"),
-                (50, "-zsh"),
-                (10, "/Applications/iTerm2.app/Contents/MacOS/iTerm2"),
-            ])
-            result = _find_terminal_app_for_pid(12345)
-            assert result == "iTerm2"
-
-    def test_finds_terminal_app(self) -> None:
-        with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = _mock_ps_chain([
-                (100, "-zsh"),
-                (10, "/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal"),
-            ])
-            result = _find_terminal_app_for_pid(12345)
-            assert result == "Terminal"
-
-    def test_returns_none_at_pid_1(self) -> None:
-        with patch("subprocess.run") as mock_run:
-            # Parent is PID 1 (launchd) — no terminal found
-            mock_run.side_effect = [
-                MagicMock(returncode=0, stdout="  1\n"),
-            ]
-            result = _find_terminal_app_for_pid(12345)
-            assert result is None
-
-    def test_returns_none_on_timeout(self) -> None:
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("ps", 2)):
-            result = _find_terminal_app_for_pid(12345)
+            mock_run.return_value = MagicMock(returncode=1, stdout="")
+            result = get_tty_for_pid(99999)
             assert result is None
 
     def test_returns_none_on_empty_output(self) -> None:
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="")
-            result = _find_terminal_app_for_pid(12345)
+            mock_run.return_value = MagicMock(returncode=0, stdout="  \n")
+            result = get_tty_for_pid(12345)
             assert result is None
 
-    def test_fallback_extracts_app_from_bundle_path(self) -> None:
-        """Unknown terminal with .app path should be detected via fallback."""
+    def test_returns_none_on_question_mark(self) -> None:
         with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = _mock_ps_chain([
-                (100, "-zsh"),
-                (10, "/Applications/CoolTerminal.app/Contents/MacOS/cool"),
-            ]) + [
-                # Walk hits PID 1
-                MagicMock(returncode=0, stdout="  1\n"),
-            ]
-            result = _find_terminal_app_for_pid(12345)
-            assert result == "CoolTerminal"
+            mock_run.return_value = MagicMock(returncode=0, stdout="?\n")
+            result = get_tty_for_pid(12345)
+            assert result is None
 
-    def test_app_bundle_regex(self) -> None:
-        assert _APP_BUNDLE_RE.search("/Applications/Foo.app/Contents/MacOS/x")
-        assert _APP_BUNDLE_RE.search("/Applications/Foo.app/Contents/MacOS/x").group(1) == "Foo"
-        assert _APP_BUNDLE_RE.search("/Applications/Foo Bar.app/Contents/MacOS/x").group(1) == "Foo Bar"
-        assert _APP_BUNDLE_RE.search("/usr/bin/python") is None
+    def test_returns_none_on_timeout(self) -> None:
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("ps", 5)):
+            result = get_tty_for_pid(12345)
+            assert result is None
+
+    def test_returns_none_on_os_error(self) -> None:
+        with patch("subprocess.run", side_effect=OSError("no ps")):
+            result = get_tty_for_pid(12345)
+            assert result is None
 
 
-class TestBadgeAndActivate:
-    def test_success(self) -> None:
-        with patch("subprocess.run") as mock_run, \
-             patch("os.open", side_effect=OSError):
+class TestActivateTerminalForTty:
+    def test_tries_ghostty_first(self) -> None:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
-            assert _badge_and_activate("Warp", None) is True
+            result = activate_terminal_for_tty("ttys003")
+            assert result is True
+            call_args = mock_run.call_args
+            assert call_args[0][0][0] == "osascript"
+            assert "Ghostty" in call_args[0][0][2]
 
-    def test_failure(self) -> None:
+    def test_falls_back_to_iterm(self) -> None:
+        with patch("subprocess.run") as mock_run:
+            # First call (Ghostty) fails, second (iTerm) succeeds
+            mock_run.side_effect = [
+                MagicMock(returncode=1),
+                MagicMock(returncode=0),
+            ]
+            result = activate_terminal_for_tty("ttys003")
+            assert result is True
+            assert mock_run.call_count == 2
+
+    def test_falls_back_to_terminal_app(self) -> None:
+        with patch("subprocess.run") as mock_run:
+            # Ghostty and iTerm fail, Terminal.app succeeds
+            mock_run.side_effect = [
+                MagicMock(returncode=1),
+                MagicMock(returncode=1),
+                MagicMock(returncode=0),
+            ]
+            result = activate_terminal_for_tty("ttys003")
+            assert result is True
+            assert mock_run.call_count == 3
+
+    def test_returns_false_when_all_fail(self) -> None:
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=1)
-            assert _badge_and_activate("Warp", None) is False
+            result = activate_terminal_for_tty("ttys003")
+            assert result is False
 
-    def test_timeout(self) -> None:
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("osascript", 5)):
-            assert _badge_and_activate("Warp", None) is False
-
-    def test_rings_bell_on_tty(self) -> None:
-        with patch("subprocess.run") as mock_run, \
-             patch("os.open", return_value=5) as mock_open, \
-             patch("os.write") as mock_write, \
-             patch("os.close"):
-            mock_run.return_value = MagicMock(returncode=0)
-            assert _badge_and_activate("Warp", "ttys003") is True
-            mock_open.assert_called_once()
-            mock_write.assert_called_once_with(5, b"\a")
-
-
-class TestActivateWarpTab:
-    def setup_method(self) -> None:
-        _warp_tab_cache.clear()
-
-    def test_caches_tab_index_on_scan(self) -> None:
-        with patch("monitorator.terminal_opener._warp_scan_tabs", return_value=3) as mock_scan:
-            assert _activate_warp_tab("my-project") is True
-            mock_scan.assert_called_once()
-            assert _warp_tab_cache["my-project"] == 3
-
-    def test_uses_cache_on_second_call(self) -> None:
-        with patch("monitorator.terminal_opener._warp_try_tab", return_value=True) as mock_try, \
-             patch("monitorator.terminal_opener._warp_scan_tabs") as mock_scan:
-            _warp_tab_cache["my-project"] = 2
-            assert _activate_warp_tab("my-project") is True
-            mock_try.assert_called_once_with("my-project", 2)
-            mock_scan.assert_not_called()
-
-    def test_rescans_when_cache_stale(self) -> None:
-        _warp_tab_cache["my-project"] = 2
-        with patch("monitorator.terminal_opener._warp_try_tab", return_value=False), \
-             patch("monitorator.terminal_opener._warp_scan_tabs", return_value=4) as mock_scan:
-            assert _activate_warp_tab("my-project") is True
-            mock_scan.assert_called_once()
-            assert _warp_tab_cache["my-project"] == 4
-
-    def test_returns_false_when_not_found(self) -> None:
-        with patch("monitorator.terminal_opener._warp_scan_tabs", return_value=None):
-            assert _activate_warp_tab("nonexistent") is False
-            assert "nonexistent" not in _warp_tab_cache
+    def test_returns_false_on_exception(self) -> None:
+        with patch("subprocess.run", side_effect=OSError("no osascript")):
+            result = activate_terminal_for_tty("ttys003")
+            assert result is False
 
 
 class TestOpenTerminalForPid:
-    def test_opens_warp_with_tab_title(self) -> None:
-        with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="Warp"), \
-             patch("monitorator.terminal_opener._activate_warp_tab", return_value=True) as mock_warp:
-            result = open_terminal_for_pid(12345, tty="ttys003", tab_title="my-project")
+    def test_success_path(self) -> None:
+        with patch("monitorator.terminal_opener.get_tty_for_pid", return_value="ttys003"), \
+             patch("monitorator.terminal_opener.activate_terminal_for_tty", return_value=True):
+            result = open_terminal_for_pid(12345)
             assert result is True
-            mock_warp.assert_called_once_with("my-project")
 
-    def test_opens_warp_fallback_without_title(self) -> None:
-        with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="Warp"), \
-             patch("monitorator.terminal_opener._badge_and_activate", return_value=True) as mock_badge:
-            result = open_terminal_for_pid(12345, tty="ttys003")
-            assert result is True
-            mock_badge.assert_called_once_with("Warp", "ttys003")
-
-    def test_opens_iterm2_with_tab_focus(self) -> None:
-        with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="iTerm2"), \
-             patch("monitorator.terminal_opener._activate_iterm2_tab", return_value=True) as mock_tab:
-            result = open_terminal_for_pid(12345, tty="ttys003")
-            assert result is True
-            mock_tab.assert_called_once_with("ttys003")
-
-    def test_opens_terminal_app_with_tab_focus(self) -> None:
-        with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="Terminal"), \
-             patch("monitorator.terminal_opener._activate_terminal_tab", return_value=True) as mock_tab:
-            result = open_terminal_for_pid(12345, tty="ttys003")
-            assert result is True
-            mock_tab.assert_called_once_with("ttys003")
-
-    def test_no_terminal_found(self) -> None:
-        with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value=None):
+    def test_no_tty_returns_false(self) -> None:
+        with patch("monitorator.terminal_opener.get_tty_for_pid", return_value=None):
             result = open_terminal_for_pid(12345)
             assert result is False
 
-    def test_falls_back_to_badge_when_no_tty(self) -> None:
-        with patch("monitorator.terminal_opener._find_terminal_app_for_pid", return_value="iTerm2"), \
-             patch("monitorator.terminal_opener._badge_and_activate", return_value=True) as mock_activate:
+    def test_activation_fails_returns_false(self) -> None:
+        with patch("monitorator.terminal_opener.get_tty_for_pid", return_value="ttys003"), \
+             patch("monitorator.terminal_opener.activate_terminal_for_tty", return_value=False):
             result = open_terminal_for_pid(12345)
-            assert result is True
-            mock_activate.assert_called_once_with("iTerm2", None)
+            assert result is False
