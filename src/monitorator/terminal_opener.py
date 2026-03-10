@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 
@@ -120,8 +121,22 @@ def _activate_terminal_tab(tty: str) -> bool:
     return _run_osascript(script)
 
 
-def _activate_app(app_name: str) -> bool:
-    """Activate a terminal app (brings to front)."""
+def _badge_and_activate(app_name: str, tty: str | None) -> bool:
+    """Ring the bell on the TTY to badge the tab, then activate the app.
+
+    Used for terminals that don't expose tab-level APIs (Warp, Ghostty,
+    kitty, etc.). The bell causes most terminals to highlight/badge the
+    tab so the user can find it.
+    """
+    if tty:
+        try:
+            fd = os.open(f"/dev/{tty}", os.O_WRONLY | os.O_NOCTTY)
+            try:
+                os.write(fd, b"\a")
+            finally:
+                os.close(fd)
+        except OSError:
+            pass
     return _run_osascript(f'tell application "{app_name}" to activate')
 
 
@@ -156,4 +171,5 @@ def open_terminal_for_pid(pid: int, tty: str | None = None) -> bool:
         if app == "Terminal":
             return _activate_terminal_tab(tty)
 
-    return _activate_app(app)
+    # For all other terminals: bell to badge the tab + activate
+    return _badge_and_activate(app, tty)
