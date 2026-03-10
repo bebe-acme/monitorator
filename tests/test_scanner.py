@@ -130,6 +130,22 @@ class TestProcessScanner:
             results = scanner.scan()
         assert len(results) == 1
 
+    def test_excludes_claude_desktop_app(self) -> None:
+        """Claude Desktop app processes should not be detected as Claude CLI."""
+        mock_ps = (
+            "  PID  %CPU   ELAPSED COMMAND\n"
+            "44444  0.0  4-02:15:00 /Applications/Claude.app/Contents/MacOS/Claude\n"
+            "44445  0.0  4-02:15:00 /Applications/Claude.app/Contents/Frameworks/Claude Helper (GPU).app/Contents/MacOS/Claude Helper (GPU) --type=gpu-process\n"
+            "44446  0.0  4-02:15:00 /Applications/Claude.app/Contents/Frameworks/Claude Helper (Renderer).app/Contents/MacOS/Claude Helper (Renderer) --type=renderer\n"
+        )
+        scanner = ProcessScanner()
+        with (
+            patch.object(scanner, "_run_ps", return_value=mock_ps),
+            patch.object(scanner, "_run_lsof", return_value=""),
+        ):
+            results = scanner.scan()
+        assert len(results) == 0
+
     def test_excludes_unrelated_claude_substring(self) -> None:
         """A process that merely contains 'claude' in path but isn't Claude binary."""
         mock_ps = (

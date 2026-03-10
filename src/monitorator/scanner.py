@@ -144,12 +144,16 @@ class ProcessScanner:
         return best_uuid
 
     _EXCLUDED_FLAGS = ("--chrome-native-host",)
+    _EXCLUDED_PATHS = ("claude.app",)
 
     def _is_claude_process(self, command: str) -> bool:
-        # Exclude helper processes like Chrome extension native host
+        # Exclude helper processes like Chrome extension native host or Claude Desktop app
         cmd_lower = command.lower()
         for flag in self._EXCLUDED_FLAGS:
             if flag in cmd_lower:
+                return False
+        for path_fragment in self._EXCLUDED_PATHS:
+            if path_fragment in cmd_lower:
                 return False
 
         # Check if any token's basename is a Claude binary
