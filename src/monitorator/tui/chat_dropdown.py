@@ -7,7 +7,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 
 from monitorator.models import MergedSession
-from monitorator.session_prompt import get_session_history
+from monitorator.session_prompt import find_newest_jsonl_for_cwd, get_session_history
 
 
 class ChatMessage(Static):
@@ -41,6 +41,12 @@ class ChatDropdown(VerticalScroll):
                 session.hook_state.cwd,
                 session.hook_state.session_id,
             )
+        # Last resort: scan project dir for newest JSONL (hookless sessions)
+        cwd = session.process_info.cwd if session.process_info else None
+        if cwd:
+            _path, uuid = find_newest_jsonl_for_cwd(cwd)
+            if uuid:
+                return get_session_history(cwd, uuid)
         return []
 
     def compose(self) -> ComposeResult:

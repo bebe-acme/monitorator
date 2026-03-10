@@ -47,6 +47,57 @@ def find_session_jsonl(
     return None
 
 
+def find_newest_jsonl_for_cwd(
+    cwd: str, claude_dir: str | None = None
+) -> tuple[str | None, str | None]:
+    """Find the most recently modified JSONL file for a cwd (no UUID needed).
+
+    Walks up parent directories like find_session_jsonl, but instead of
+    looking for a specific UUID, finds the newest .jsonl file in the project
+    directory.  Used as a fallback for hookless sessions where we only have
+    the process cwd.
+
+    Returns (jsonl_path, uuid) or (None, None).
+    """
+    if not cwd:
+        return None, None
+
+    if claude_dir is None:
+        claude_dir = os.path.expanduser("~/.claude")
+
+    projects_dir = os.path.join(claude_dir, "projects")
+    current = cwd
+    while current and current != "/":
+        mangled = mangle_cwd(current)
+        proj_dir = os.path.join(projects_dir, mangled)
+        if os.path.isdir(proj_dir):
+            best_path: str | None = None
+            best_uuid: str | None = None
+            best_mtime: float = -1.0
+            try:
+                for entry in os.listdir(proj_dir):
+                    if not entry.endswith(".jsonl"):
+                        continue
+                    full = os.path.join(proj_dir, entry)
+                    try:
+                        mtime = os.path.getmtime(full)
+                    except OSError:
+                        continue
+                    if mtime > best_mtime:
+                        best_mtime = mtime
+                        best_path = full
+                        best_uuid = entry[:-6]  # strip .jsonl
+            except OSError:
+                pass
+            if best_path:
+                return best_path, best_uuid
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+    return None, None
+
+
 def read_last_user_prompt(jsonl_path: str) -> str | None:
     """Read from end of file in chunks. Find last type=user message with
     content[].type=text. Skip tool_results, <local-command>, <command-name>."""
