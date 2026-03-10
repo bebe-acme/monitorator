@@ -321,7 +321,10 @@ class MonitoratorApp(App[None]):
         if isinstance(focused, SessionRow):
             session = focused.session
             if session.process_info:
-                open_terminal_for_pid(session.process_info.pid)
+                open_terminal_for_pid(
+                    session.process_info.pid,
+                    tty=session.process_info.tty,
+                )
 
     def action_cursor_down(self) -> None:
         self._focus_adjacent_row(direction=1)
