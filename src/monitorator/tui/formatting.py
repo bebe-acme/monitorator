@@ -45,20 +45,6 @@ _TOOL_DISPLAY: dict[str, str] = {
 _MAX_PATH_LEN = 50
 
 
-def _get_jsonl_prompt(session: MergedSession) -> str | None:
-    """Try to read last user prompt from JSONL transcript."""
-    from monitorator.session_prompt import get_session_prompt
-
-    # Try process_info UUID first
-    if session.process_info and session.process_info.session_uuid and session.process_info.cwd:
-        return get_session_prompt(session.process_info.cwd, session.process_info.session_uuid)
-    # Try hook_state cwd with process UUID
-    cwd = session.hook_state.cwd if session.hook_state else None
-    uuid = session.process_info.session_uuid if session.process_info else None
-    if cwd and uuid:
-        return get_session_prompt(cwd, uuid)
-    return None
-
 
 def _get_desc(session: MergedSession) -> str | None:
     """Extract session prompt or project description for process-only sessions.
@@ -157,15 +143,8 @@ def format_activity(session: MergedSession) -> str:
             return f"!! Permission: {tool} {cmd_text}"
         return "Awaiting permission"
 
-    # Idle states
+    # Idle states — prompt is shown on its own line, so activity shows elapsed time
     if status == SessionStatus.IDLE:
-        if hs and hs.last_prompt_summary:
-            return hs.last_prompt_summary[:60]
-        # Try JSONL prompt for hooked sessions without prompt
-        if hs and not hs.last_prompt_summary:
-            jsonl_prompt = _get_jsonl_prompt(session)
-            if jsonl_prompt:
-                return jsonl_prompt[:60]
         if hs and hs.updated_at:
             ago = int(time.time() - hs.updated_at)
             if ago < 60:

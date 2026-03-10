@@ -4,6 +4,7 @@ import os
 
 from textual.widgets import Static
 
+from monitorator.context_size import get_context_estimate
 from monitorator.models import MergedSession
 from monitorator.project_metadata import get_project_description
 from monitorator.session_prompt import get_session_prompt
@@ -88,7 +89,22 @@ class DetailPanel(Static):
         prompt = s.hook_state.last_prompt_summary if s.hook_state and s.hook_state.last_prompt_summary else ""
         subagents = s.hook_state.subagent_count if s.hook_state else 0
 
-        # Row 1: status icon + status label, PID, CPU, elapsed timer
+        # Context estimate — try process UUID first, then hook session_id
+        ctx = "-"
+        ctx_uuid = None
+        ctx_cwd = None
+        if s.process_info and s.process_info.session_uuid and s.process_info.cwd:
+            ctx_uuid = s.process_info.session_uuid
+            ctx_cwd = s.process_info.cwd
+        if not ctx_uuid and s.hook_state and s.hook_state.session_id and s.hook_state.cwd:
+            ctx_uuid = s.hook_state.session_id
+            ctx_cwd = s.hook_state.cwd
+        if ctx_uuid and ctx_cwd:
+            estimate = get_context_estimate(ctx_cwd, ctx_uuid)
+            if estimate:
+                ctx = estimate
+
+        # Row 1: status icon + status label, PID, CPU, elapsed timer, context
         from monitorator.models import SessionStatus as SS
         _active = {SS.THINKING, SS.EXECUTING, SS.SUBAGENT_RUNNING}
         status_label = status.value.upper().replace("_", " ")
@@ -106,6 +122,8 @@ class DetailPanel(Static):
             f"[#555555]CPU [/][#cccccc]{cpu}[/]"
             f"       "
             f"[#555555]\u23f1 [/][#cccccc]{elapsed}[/]"
+            f"       "
+            f"[#555555]ctx [/][#888888]{ctx}[/]"
         )
 
         # Row 2: branch + cwd
