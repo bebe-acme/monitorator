@@ -237,19 +237,19 @@ SPRITE_TEMPLATES: list[list[list[int]]] = [
         [0, 0, 0, 0, 1, 5, 1, 5, 0, 0, 0, 0],
         [0, 0, 0, 1, 5, 5, 5, 5, 1, 0, 0, 0],
     ],
-    # -- 13: Snake ------------------------------------------------------------
-    # Winding S-shaped body, head with tongue, patterned back
+    # -- 13: Pirate -----------------------------------------------------------
+    # Bandana, eyepatch, stubble, coat, peg leg
     [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0],
-        [5, 1, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0],
-        [0, 0, 0, 2, 2, 3, 2, 2, 2, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 2, 2, 3, 2, 1, 0],
-        [0, 0, 0, 0, 0, 1, 2, 3, 2, 2, 1, 0],
-        [0, 0, 0, 1, 2, 2, 2, 2, 2, 0, 0, 0],
-        [0, 0, 0, 2, 2, 3, 2, 2, 1, 0, 0, 0],
-        [0, 0, 0, 1, 2, 6, 1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 2, 2, 2, 2, 1, 0, 0, 0],  # bandana top
+        [0, 0, 1, 2, 2, 3, 3, 2, 2, 1, 0, 0],  # bandana + knot
+        [0, 0, 1, 5, 5, 5, 5, 5, 5, 1, 0, 0],  # face
+        [0, 0, 1, 1, 4, 5, 5, 4, 5, 1, 0, 0],  # eyepatch + eye
+        [0, 0, 1, 5, 5, 6, 6, 5, 5, 1, 0, 0],  # stubble/mouth
+        [0, 0, 0, 1, 5, 5, 5, 5, 1, 0, 0, 0],  # chin
+        [0, 0, 1, 2, 2, 3, 3, 2, 2, 1, 0, 0],  # coat + belt
+        [0, 1, 6, 1, 2, 2, 2, 2, 1, 6, 1, 0],  # arms + hooks
+        [0, 0, 1, 2, 2, 1, 1, 2, 2, 1, 0, 0],  # legs
+        [0, 0, 1, 6, 6, 0, 0, 6, 6, 1, 0, 0],  # boots
     ],
     # -- 14: Spider -----------------------------------------------------------
     # Eight legs radiating from round body, multiple eyes
@@ -293,19 +293,19 @@ SPRITE_TEMPLATES: list[list[list[int]]] = [
         [0, 0, 0, 0, 1, 6, 6, 6, 1, 0, 0, 0],
         [0, 0, 0, 0, 1, 2, 1, 2, 1, 0, 0, 0],
     ],
-    # -- 17: Spaceship --------------------------------------------------------
-    # Rocket shape, cockpit window, engine flames
+    # -- 17: Wizard -----------------------------------------------------------
+    # Pointy hat with star, long beard, robe, staff
     [
-        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 2, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 2, 3, 2, 1, 0, 0, 0],
-        [0, 0, 0, 1, 2, 2, 3, 2, 2, 0, 0, 0],
-        [0, 0, 1, 2, 2, 5, 2, 5, 2, 2, 1, 0],
-        [1, 2, 2, 2, 2, 2, 2, 2, 2, 5, 2, 2],
-        [1, 6, 2, 2, 2, 2, 2, 2, 2, 5, 2, 6],
-        [0, 0, 1, 1, 2, 2, 2, 2, 2, 0, 1, 0],
-        [0, 0, 0, 1, 2, 5, 2, 5, 2, 0, 0, 0],
-        [0, 0, 0, 0, 1, 6, 4, 6, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0],  # hat tip
+        [0, 0, 0, 0, 1, 2, 1, 0, 0, 0, 0, 0],  # hat top
+        [0, 0, 0, 1, 2, 4, 2, 1, 0, 0, 0, 0],  # hat + star
+        [0, 0, 1, 2, 2, 2, 2, 2, 1, 0, 0, 0],  # hat brim
+        [0, 0, 1, 5, 4, 5, 5, 4, 5, 1, 0, 0],  # face + eyes
+        [0, 0, 1, 5, 3, 3, 3, 3, 5, 1, 0, 0],  # beard
+        [0, 0, 0, 1, 3, 3, 3, 3, 1, 0, 0, 0],  # beard lower
+        [0, 3, 1, 2, 2, 2, 2, 2, 2, 1, 0, 0],  # robe + staff
+        [0, 0, 1, 2, 2, 1, 1, 2, 2, 1, 0, 0],  # robe bottom
+        [0, 0, 0, 6, 6, 0, 0, 6, 6, 0, 0, 0],  # sandals
     ],
     # -- 18: Rabbit -----------------------------------------------------------
     # Long ears, round body, fluffy tail
@@ -486,14 +486,14 @@ SPRITE_PALETTES: list[dict[int, str]] = [
         5: "#F8D878",  # yellow beak/feet
         6: "#2898C8",  # dark sky tail
     },
-    # 13: Snake -- chartreuse (yellow-green)
+    # 13: Pirate -- chartreuse (yellow-green coat)
     {
         1: "#000000",
-        2: "#A8D800",  # chartreuse body
-        3: "#D8F858",  # light chartreuse pattern
-        4: "#FFFFFF",  # white eyes
-        5: "#F8D878",  # yellow tongue
-        6: "#688800",  # dark chartreuse tail
+        2: "#A8D800",  # chartreuse coat
+        3: "#D8F858",  # belt/accent
+        4: "#FFFFFF",  # white eye
+        5: "#FCA044",  # skin
+        6: "#688800",  # dark boots/hooks
     },
     # 14: Spider -- tan (light brown)
     {
@@ -522,14 +522,14 @@ SPRITE_PALETTES: list[dict[int, str]] = [
         5: "#656565",  # gray details
         6: "#405800",  # dark olive
     },
-    # 17: Spaceship -- indigo (deep blue)
+    # 17: Wizard -- indigo (deep blue robe)
     {
         1: "#000000",
-        2: "#3850E0",  # indigo hull
-        3: "#7888F8",  # light indigo cockpit
-        4: "#FC0000",  # red engine
-        5: "#2038A0",  # dark indigo panels
-        6: "#102060",  # darkest indigo
+        2: "#3850E0",  # indigo robe
+        3: "#C8C0B0",  # beard (warm gray)
+        4: "#F8D878",  # star/eyes (gold)
+        5: "#FCA044",  # skin
+        6: "#2038A0",  # dark sandals
     },
     # 18: Rabbit -- cream (warm off-white)
     {
@@ -586,11 +586,11 @@ SPRITE_NAMES: list[str] = [
     "Turtle",
     "Duck",
     "Bird",
-    "Snake",
+    "Pirate",
     "Spider",
     "Skeleton",
     "Zombie",
-    "Spaceship",
+    "Wizard",
     "Rabbit",
     "Mushroom",
     "Heart",
