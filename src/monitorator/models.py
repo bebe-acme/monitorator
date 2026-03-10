@@ -82,6 +82,7 @@ class ProcessInfo:
     cwd: str
     command: str
     session_uuid: Optional[str] = None
+    tty: Optional[str] = None
 
 
 @dataclass
