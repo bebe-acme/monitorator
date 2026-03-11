@@ -141,8 +141,8 @@ class MonitoratorApp(App[None]):
                 if hook_time and now - hook_time > STALE_HOOK_THRESHOLD:
                     m.effective_status = SessionStatus.IDLE
 
-        # Rename terminal tabs (uses exact CWD matching, not merger's loose match)
-        rename_tabs(processes, merged)
+        # Rename terminal tabs using merger's established process links
+        rename_tabs(merged)
 
         # Check transitions on ALL sessions (including terminated) for notifications
         all_current = {m.session_id: m for m in merged}
