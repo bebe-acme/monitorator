@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from monitorator.labels import get_label
-from monitorator.models import MergedSession, ProcessInfo, SessionStatus
+from monitorator.models import MergedSession, SessionStatus
 
 # Colored dot prefixes for non-running states.
 # Running states (thinking/executing/subagent) get no prefix — that's the
@@ -39,86 +39,17 @@ def _write_osc_title(tty: str, title: str) -> bool:
         return False
 
 
-def _cwds_related(a: str, b: str) -> bool:
-    """Check if two paths are equal or one is a parent of the other."""
-    return a == b or a.startswith(b + "/") or b.startswith(a + "/")
+def rename_tabs(sessions: list[MergedSession]) -> None:
+    """Rename terminal tabs using the merger's established process links.
 
-
-def _match_processes_to_sessions(
-    processes: list[ProcessInfo],
-    sessions: list[MergedSession],
-) -> dict[int, MergedSession]:
-    """Match processes to sessions with two-pass CWD matching.
-
-    Pass 1: exact CWD match (most reliable).
-    Pass 2: parent/child CWD match for leftovers (handles cases where the
-    process CWD is a parent of the hook-reported CWD).
-
-    Each process and session can only match once.
+    Each MergedSession already has process_info linked by the merger.
+    We just write the session name to that process's TTY — no re-matching.
     """
-    # Collect sessions with hook CWDs
-    available: list[tuple[str, MergedSession]] = []
     for session in sessions:
-        cwd = session.hook_state.cwd if session.hook_state else None
-        if cwd:
-            available.append((cwd.rstrip("/"), session))
-
-    matched: dict[int, MergedSession] = {}
-    matched_session_ids: set[str] = set()
-
-    # Pass 1: exact CWD match
-    for proc in processes:
-        if not proc.tty or not proc.cwd:
-            continue
-        key = proc.cwd.rstrip("/")
-        for cwd, session in available:
-            if session.session_id in matched_session_ids:
-                continue
-            if cwd == key:
-                matched[proc.pid] = session
-                matched_session_ids.add(session.session_id)
-                break
-
-    # Pass 2: parent/child match for remaining processes
-    for proc in processes:
-        if proc.pid in matched or not proc.tty or not proc.cwd:
-            continue
-        key = proc.cwd.rstrip("/")
-        for cwd, session in available:
-            if session.session_id in matched_session_ids:
-                continue
-            if _cwds_related(key, cwd):
-                matched[proc.pid] = session
-                matched_session_ids.add(session.session_id)
-                break
-
-    return matched
-
-
-def rename_tabs(
-    processes: list[ProcessInfo],
-    sessions: list[MergedSession],
-) -> None:
-    """Rename terminal tabs using two-pass CWD matching.
-
-    Goes process-first: each process's own TTY gets renamed based on its CWD
-    matched to the correct session. Exact match first, then parent/child for
-    leftovers, so each process gets a distinct session.
-    """
-    pid_to_session = _match_processes_to_sessions(processes, sessions)
-
-    for proc in processes:
-        if not proc.tty or not proc.cwd:
+        proc = session.process_info
+        if not proc or not proc.tty:
             continue
 
-        session = pid_to_session.get(proc.pid)
-
-        if session:
-            label = get_label(session.session_id)
-            name = label if label else session.project_name
-            status = session.effective_status
-        else:
-            name = proc.cwd.rstrip("/").rsplit("/", 1)[-1]
-            status = SessionStatus.IDLE
-
-        _write_osc_title(proc.tty, _build_title(name, status))
+        label = get_label(session.session_id)
+        name = label if label else session.project_name
+        _write_osc_title(proc.tty, _build_title(name, session.effective_status))
