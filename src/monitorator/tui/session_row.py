@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 import shutil
 
+from textual.app import ComposeResult
+from textual.widget import Widget
 from textual.widgets import Static
 from textual.message import Message
 
@@ -117,14 +119,30 @@ def get_layout_config(term_width: int | None = None) -> dict[str, object]:
 _LABEL_MAX = 30
 
 
-class SessionRow(Static, can_focus=True):
+class SessionSprite(Static):
+    """Fixed-width sprite display for session rows.
+
+    Isolated widget so text content can never overflow into the sprite area.
+    """
+
+
+class SessionText(Static):
+    """Session info text content — fills remaining width next to sprite."""
+
+
+class SessionRow(Widget, can_focus=True):
     """Session row with sprite character and rich status-based coloring.
 
-    Line 1: sprite_l1 | status_badge | PROJECT | branch | [label]
-    Line 2: sprite_l2 | last prompt
-    Line 3: sprite_l3 | latest activity / agent response
-    Line 4: sprite_l4 | cpu | elapsed | ctx  (or NEEDS HUMAN INTERVENTION)
-    Line 5: sprite_l5 |
+    Horizontal layout: fixed-width SessionSprite + flexible SessionText.
+    The sprite is its own component so text overflow cannot bleed into it.
+
+    SessionSprite (line 1-5): animated character
+    SessionText:
+      Line 1: status_badge | PROJECT | branch | [label]
+      Line 2: last prompt
+      Line 3: latest activity / agent response
+      Line 4: cpu | elapsed | ctx  (or NEEDS HUMAN INTERVENTION)
+      Line 5: (empty)
     """
 
     class Selected(Message):
@@ -139,10 +157,39 @@ class SessionRow(Static, can_focus=True):
         self._sprite_idx: int = sprite_index_for_session(session.session_id)
         self._anim_frame: int = 0
         self._compact: bool = False
-        super().__init__(self._build_content(), markup=True)
+        super().__init__()
         self._sync_status_classes()
 
-    def _build_content(self) -> str:
+    def compose(self) -> ComposeResult:
+        yield SessionSprite(self._build_sprite(), markup=True)
+        yield SessionText(self._build_text(), markup=True)
+
+    # ── Width helpers ──
+
+    def _get_text_width(self) -> int:
+        """Return available character width for the text content widget."""
+        try:
+            w = self.query_one(SessionText).content_size.width
+            if w > 0:
+                return w
+        except Exception:
+            pass
+        # Fallback before mount: terminal width minus sprite and chrome
+        return max(40, _get_term_width() - 22)
+
+    # ── Content builders ──
+
+    def _build_sprite(self) -> str:
+        """Build the 5-line sprite column."""
+        sp1, sp2, sp3, sp4, sp5 = get_sprite_frame(
+            status=self.session.effective_status,
+            anim_frame=self._anim_frame,
+            sprite_idx=self._sprite_idx,
+        )
+        return f"{sp1}\n{sp2}\n{sp3}\n{sp4}\n{sp5}"
+
+    def _build_text(self) -> str:
+        """Build the 5-line text content adjacent to the sprite."""
         s = self.session
         status = s.effective_status
         icon = STATUS_ICONS.get(status, "?")
@@ -192,11 +239,6 @@ class SessionRow(Static, can_focus=True):
         color = STATUS_COLORS.get(status, "#666666")
         proj_color = get_sprite_color(sprite_idx=self._sprite_idx)
 
-        # Sprite for this session — 5-line character (10x12 grid -> 5 half-block lines)
-        sp1, sp2, sp3, sp4, sp5 = get_sprite_frame(
-            status=status, anim_frame=self._anim_frame, sprite_idx=self._sprite_idx,
-        )
-
         # Status badge (icon + label)
         status_badge = f"{icon} {label_text:<5s}"
         if status == SessionStatus.WAITING_PERMISSION:
@@ -206,13 +248,13 @@ class SessionRow(Static, can_focus=True):
         else:
             badge_markup = f"[{color}]{status_badge}[/]"
 
-        # Line 1: sprite + status badge + project pixel badge + branch + label
+        # Line 1: status badge + project pixel badge + branch + label
         proj_badge = (
             f"[{proj_color}]\u2590[/]"
             f"[bold #0a0a0a on {proj_color}] {project} [/]"
             f"[{proj_color}]\u258c[/]"
         )
-        line1_parts = f" {sp1} {badge_markup}  {proj_badge}"
+        line1_parts = f"{badge_markup}  {proj_badge}"
         # Pad to keep alignment (badge has 2 extra chars from ▐▌ + spaces)
         pad_needed = max(0, proj_w - len(project) - 2)
         line1_parts += " " * pad_needed
@@ -232,10 +274,10 @@ class SessionRow(Static, can_focus=True):
             line1 = line1_parts
 
         # Adaptive text length for lines 2-3
-        tw = _get_term_width()
-        desc_max = max(20, tw - 24)  # sprite(12) + pads + └─ + margin
+        text_w = self._get_text_width()
+        desc_max = max(20, text_w - 7)  # 7 = "    └─ " prefix
 
-        # Line 2: sprite + last prompt (always shown unless compact)
+        # Line 2: last prompt (always shown unless compact)
         prompt_text: str | None = None
         if not self._compact:
             prompt_text = _sanitize_prompt(self._get_prompt())
@@ -243,32 +285,38 @@ class SessionRow(Static, can_focus=True):
         if prompt_text:
             truncated = (prompt_text[:desc_max - 1] + "\u2026") if len(prompt_text) > desc_max else prompt_text
             text_color = _PROMPT_COLORS.get(status, "#555555")
-            line2 = f" {sp2}    [#555555]\u2514\u2500[/] [italic {text_color}]{truncated}[/]"
+            line2 = f"    [#555555]\u2514\u2500[/] [italic {text_color}]{truncated}[/]"
         else:
-            line2 = f" {sp2}[#0a0a0a].[/]"
+            line2 = "[#0a0a0a].[/]"
 
-        # Line 3: sprite + latest activity / agent response
+        # Line 3: latest activity / agent response
         activity_text: str | None = None
         if not self._compact:
             activity_raw = format_activity(s)
             activity_text = (activity_raw[:desc_max - 1] + "\u2026") if len(activity_raw) > desc_max else activity_raw
 
         if activity_text:
-            line3 = f" {sp3}    [#555555]\u2514\u2500[/] [{_ACTIVITY_COLOR}]{activity_text}[/]"
+            line3 = f"    [#555555]\u2514\u2500[/] [{_ACTIVITY_COLOR}]{activity_text}[/]"
         else:
-            line3 = f" {sp3}[#0a0a0a].[/]"
+            line3 = "[#0a0a0a].[/]"
 
-        # Line 4: sprite + cpu/elapsed/ctx  (or NEEDS HUMAN INTERVENTION)
+        # Line 4: cpu/elapsed/ctx  (or NEEDS HUMAN INTERVENTION)
         if status == SessionStatus.WAITING_PERMISSION:
-            line4 = f" {sp4}    [bold #ff3333 blink]\u26a0 NEEDS HUMAN INTERVENTION[/]"
+            line4 = f"    [bold #ff3333 blink]\u26a0 NEEDS HUMAN INTERVENTION[/]"
         else:
-            line4 = f" {sp4}    [#555555]{cpu:>5s}[/]  [#444444]{elapsed}[/]"
+            line4 = f"    [#555555]{cpu:>5s}[/]  [#444444]{elapsed}[/]"
             if show_ctx:
                 line4 += f"  [#888888]{ctx:>6s}[/]"
 
-        line5 = f" {sp5}[#0a0a0a].[/]"
+        line5 = "[#0a0a0a].[/]"
 
         return f"{line1}\n{line2}\n{line3}\n{line4}\n{line5}"
+
+    def _build_content(self) -> str:
+        """Combined sprite + text content (backward-compatible for tests)."""
+        sprite_lines = self._build_sprite().split("\n")
+        text_lines = self._build_text().split("\n")
+        return "\n".join(f" {s} {t}" for s, t in zip(sprite_lines, text_lines))
 
     def _get_prompt(self) -> str | None:
         """Get session prompt — tries hook data first, then JSONL transcript."""
@@ -299,7 +347,11 @@ class SessionRow(Static, can_focus=True):
 
     def refresh_content(self) -> None:
         self._anim_frame += 1
-        self.update(self._build_content())
+        try:
+            self.query_one(SessionSprite).update(self._build_sprite())
+            self.query_one(SessionText).update(self._build_text())
+        except Exception:
+            pass  # Not yet composed (e.g. in unit tests)
 
     def _sync_status_classes(self) -> None:
         """Sync CSS classes based on session status (needs-input + status bar)."""

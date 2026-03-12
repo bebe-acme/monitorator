@@ -70,12 +70,32 @@ ColumnHeader {
 /* ─── Session Rows ─── */
 
 SessionRow {
+    layout: horizontal;
     height: auto;
+    min-height: 5;
     background: #0a0a0a;
     color: #cccccc;
     padding: 0 1;
     margin: 0;
     border-bottom: solid #222222;
+    overflow: hidden;
+}
+
+SessionRow > SessionSprite {
+    height: 5;
+}
+
+SessionRow > SessionText {
+    height: 5;
+}
+
+SessionSprite {
+    width: 13;
+}
+
+SessionText {
+    width: 1fr;
+    overflow: hidden;
 }
 
 SessionRow:hover {
