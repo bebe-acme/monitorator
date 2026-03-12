@@ -207,7 +207,7 @@ class TestSessionRowRendering:
         )
         row = SessionRow(session)
         content = row._build_content()
-        assert "myproject" in content
+        assert "MYPROJECT" in content
         assert "WAIT" in content
 
 

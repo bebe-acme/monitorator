@@ -101,7 +101,30 @@ class TestSessionRowContent:
         session = make_merged(project="agentator")
         row = SessionRow(session)
         content = row._build_content()
-        assert "agentator" in content
+        assert "AGENTATOR" in content
+
+    def test_project_name_is_uppercase(self) -> None:
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(project="my-cool-project")
+        row = SessionRow(session)
+        content = row._build_content()
+        assert "MY-COOL-PROJECT" in content
+        assert "my-cool-project" not in content
+
+    def test_project_name_has_pixel_badge(self) -> None:
+        """Project name rendered as pixel badge: ▐ NAME ▌ with colored bg."""
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(project="bbmedia")
+        row = SessionRow(session)
+        content = row._build_content()
+        # Half-block pixel edges
+        assert "\u2590" in content  # ▐ left edge
+        assert "\u258c" in content  # ▌ right edge
+        # Dark text on colored background
+        assert "on " in content  # Rich "on" syntax for bg color
+        assert "BBMEDIA" in content
 
     def test_contains_branch(self) -> None:
         from monitorator.tui.session_row import SessionRow
@@ -530,8 +553,9 @@ class TestSessionRowPaletteColoring:
         row.update_index(1)
         content = row._build_content()
         expected_color = get_sprite_color(sprite_idx=sprite_index_for_session(session.session_id))
-        assert f"bold {expected_color}" in content
-        assert "MyProject" in content
+        # Pixel badge: dark text on sprite-colored background
+        assert f"on {expected_color}" in content
+        assert "MYPROJECT" in content
 
 
 class TestSessionRowIdleAmber:

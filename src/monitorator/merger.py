@@ -164,6 +164,15 @@ class SessionMerger:
         processes: list[ProcessInfo],
         matched: set[int],
     ) -> ProcessInfo | None:
+        # Priority 1: Match by session UUID (exact, no ambiguity)
+        for i, proc in enumerate(processes):
+            if i in matched:
+                continue
+            if proc.session_uuid and proc.session_uuid == state.session_id:
+                matched.add(i)
+                return proc
+
+        # Priority 2: Fall back to CWD matching (for hookless/legacy sessions)
         for i, proc in enumerate(processes):
             if i in matched:
                 continue

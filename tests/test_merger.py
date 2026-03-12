@@ -454,3 +454,121 @@ class TestSessionMergerDedup:
         # Only the most recent session survives dedup
         assert len(non_stale) == 1
         assert non_stale[0].session_id == "s1"
+
+
+class TestSessionMergerUUIDMatching:
+    """UUID-based matching should prevent ghost sessions in parent/child dirs."""
+
+    def test_uuid_match_takes_priority_over_cwd(self) -> None:
+        """When UUID matches, use it even if CWD doesn't match exactly."""
+        now = time.time()
+        states = [SessionState(
+            session_id="uuid-aaa",
+            cwd="/path/BOMBO",
+            status=SessionStatus.THINKING,
+            updated_at=now,
+        )]
+        processes = [ProcessInfo(
+            pid=100, cpu_percent=15.0, elapsed_seconds=60,
+            cwd="/path/BOMBO",
+            command="claude",
+            session_uuid="uuid-aaa",
+        )]
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        assert len(merged) == 1
+        assert merged[0].process_info is not None
+        assert merged[0].process_info.pid == 100
+
+    def test_parent_child_dirs_no_cross_match(self) -> None:
+        """Two sessions in parent/child dirs should NOT steal each other's processes.
+
+        Critical: child session is NEWER, so it gets processed first by the merger.
+        Without UUID matching, the child steals the parent's process via _cwds_related().
+        """
+        now = time.time()
+        states = [
+            SessionState(
+                session_id="parent-uuid",
+                cwd="/path/BOMBO",
+                status=SessionStatus.IDLE,
+                updated_at=now - 5,  # parent is OLDER
+            ),
+            SessionState(
+                session_id="child-uuid",
+                cwd="/path/BOMBO/bombo_payments",
+                status=SessionStatus.EXECUTING,
+                updated_at=now,  # child is NEWER → processed first
+            ),
+        ]
+        processes = [
+            ProcessInfo(
+                pid=100, cpu_percent=5.0, elapsed_seconds=600,
+                cwd="/path/BOMBO",
+                command="claude",
+                session_uuid="parent-uuid",
+            ),
+            ProcessInfo(
+                pid=200, cpu_percent=15.0, elapsed_seconds=30,
+                cwd="/path/BOMBO/bombo_payments",
+                command="claude",
+                session_uuid="child-uuid",
+            ),
+        ]
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        # Each session must be matched to ITS OWN process, not cross-matched
+        by_id = {m.session_id: m for m in merged}
+        assert by_id["parent-uuid"].process_info is not None
+        assert by_id["child-uuid"].process_info is not None
+        assert by_id["parent-uuid"].process_info.pid == 100
+        assert by_id["child-uuid"].process_info.pid == 200
+
+    def test_no_ghost_session_with_parent_child_cwds(self) -> None:
+        """Parent/child CWD should not produce phantom hookless sessions.
+
+        When child is newer, without UUID matching the child steals the parent's
+        process, then parent steals child's process. Both get wrong PIDs AND no
+        ghost sessions appear, but the data is still wrong (swapped PIDs).
+        """
+        now = time.time()
+        states = [
+            SessionState(
+                session_id="sess-a",
+                cwd="/path/BOMBO",
+                status=SessionStatus.IDLE,
+                updated_at=now - 5,  # parent is OLDER
+            ),
+            SessionState(
+                session_id="sess-b",
+                cwd="/path/BOMBO/bombo_payments",
+                status=SessionStatus.EXECUTING,
+                updated_at=now,  # child is NEWER → processed first
+            ),
+        ]
+        processes = [
+            ProcessInfo(
+                pid=100, cpu_percent=5.0, elapsed_seconds=600,
+                cwd="/path/BOMBO",
+                command="claude",
+                session_uuid="sess-a",
+            ),
+            ProcessInfo(
+                pid=200, cpu_percent=15.0, elapsed_seconds=30,
+                cwd="/path/BOMBO/bombo_payments",
+                command="claude",
+                session_uuid="sess-b",
+            ),
+        ]
+        merger = SessionMerger()
+        merged = merger.merge(states, processes)
+        # Exactly 2 sessions, no ghost proc-XXX entries
+        assert len(merged) == 2
+        ids = {m.session_id for m in merged}
+        assert "sess-a" in ids
+        assert "sess-b" in ids
+        assert not any(m.session_id.startswith("proc-") for m in merged)
+        # Each matched to correct PID
+        by_id = {m.session_id: m for m in merged}
+        assert by_id["sess-a"].process_info.pid == 100
+        assert by_id["sess-b"].process_info.pid == 200

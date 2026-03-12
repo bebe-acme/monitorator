@@ -154,7 +154,8 @@ class SessionRow(Static, can_focus=True):
         show_branch: bool = layout["show_branch"]  # type: ignore[assignment]
         show_ctx: bool = layout["show_ctx"]  # type: ignore[assignment]
 
-        project = s.project_name[:proj_w - 1] + "\u2026" if len(s.project_name) > proj_w else s.project_name
+        project_upper = s.project_name.upper()
+        project = project_upper[:proj_w - 1] + "\u2026" if len(project_upper) > proj_w else project_upper
         branch_raw = (
             s.hook_state.git_branch
             if s.hook_state and s.hook_state.git_branch
@@ -205,8 +206,16 @@ class SessionRow(Static, can_focus=True):
         else:
             badge_markup = f"[{color}]{status_badge}[/]"
 
-        # Line 1: sprite + status badge + project + branch + label (right)
-        line1_parts = f" {sp1} {badge_markup}  [bold {proj_color}]{project:<{proj_w}s}[/]"
+        # Line 1: sprite + status badge + project pixel badge + branch + label
+        proj_badge = (
+            f"[{proj_color}]\u2590[/]"
+            f"[bold #0a0a0a on {proj_color}] {project} [/]"
+            f"[{proj_color}]\u258c[/]"
+        )
+        line1_parts = f" {sp1} {badge_markup}  {proj_badge}"
+        # Pad to keep alignment (badge has 2 extra chars from ▐▌ + spaces)
+        pad_needed = max(0, proj_w - len(project) - 2)
+        line1_parts += " " * pad_needed
         if show_branch:
             line1_parts += f"  [#3399ff]{branch:<10s}[/]"
 
