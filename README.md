@@ -16,8 +16,7 @@
 [![Tests](https://img.shields.io/badge/tests-593%20passing-00ff66.svg?style=flat-square)](#development)
 [![Textual](https://img.shields.io/badge/TUI-Textual-cc66ff.svg?style=flat-square)](https://textual.textualize.io/)
 
-<!-- Add your GIF here: -->
-<!-- ![Monitorator Demo](assets/demo.gif) -->
+![Monitorator Screenshot](assets/screenshot.png)
 
 ---
 
