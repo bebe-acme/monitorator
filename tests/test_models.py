@@ -212,6 +212,21 @@ class TestMergedSession:
         )
         assert merged.project_name == "fallback-proj"
 
+    def test_project_name_from_worktree_cwd_fallback(self) -> None:
+        proc = ProcessInfo(
+            pid=400, cpu_percent=0.0, elapsed_seconds=10,
+            cwd="/Users/nico/dev/myapp/.claude/worktrees/BOLD-OAK-A3F2",
+            command="claude",
+        )
+        merged = MergedSession(
+            session_id="fb-wt",
+            hook_state=None,
+            process_info=proc,
+            effective_status=SessionStatus.UNKNOWN,
+            is_stale=False,
+        )
+        assert merged.project_name == "myapp"
+
     def test_project_name_unknown_when_no_data(self) -> None:
         merged = MergedSession(
             session_id="none-1",

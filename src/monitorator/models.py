@@ -6,6 +6,19 @@ from enum import Enum
 from typing import Optional
 
 
+_WORKTREE_MARKERS = ("/.claude/worktrees/", "/.worktrees/")
+
+
+def _project_name_from_cwd(cwd: str) -> str:
+    """Extract project name from cwd, resolving through worktree paths."""
+    cleaned = cwd.rstrip("/")
+    for marker in _WORKTREE_MARKERS:
+        idx = cleaned.find(marker)
+        if idx != -1:
+            return cleaned[:idx].rsplit("/", 1)[-1] or "unknown"
+    return cleaned.rsplit("/", 1)[-1] or "unknown"
+
+
 class SessionStatus(Enum):
     IDLE = "idle"
     THINKING = "thinking"
@@ -133,5 +146,5 @@ class MergedSession:
         elif self.process_info:
             cwd = self.process_info.cwd
         if cwd:
-            return cwd.rstrip("/").rsplit("/", 1)[-1]
+            return _project_name_from_cwd(cwd)
         return "unknown"

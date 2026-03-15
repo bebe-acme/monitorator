@@ -79,9 +79,6 @@ def detect_worktree_info(cwd: str) -> tuple[str, str | None]:
     return (cleaned.rsplit("/", 1)[-1] or "unknown", None)
 
 
-def project_name_from_cwd(cwd: str) -> str:
-    return cwd.rstrip("/").rsplit("/", 1)[-1] if cwd else "unknown"
-
 
 def detect_git_branch(cwd: str) -> str | None:
     """Detect the current git branch for a directory. Returns None if not a git repo."""

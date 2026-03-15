@@ -151,7 +151,7 @@ class TestEmitEvent:
         assert data["subagent_count"] == 1
         assert data["status"] == "subagent_running"
 
-    def test_project_name_from_cwd(self, tmp_sessions_dir: Path) -> None:
+    def test_project_name_extracted_from_cwd(self, tmp_sessions_dir: Path) -> None:
         event = {
             "type": "SessionStart",
             "session_id": "sess-009",
