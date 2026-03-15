@@ -310,6 +310,97 @@ class TestEmitEvent:
         assert elapsed_ms < 2000, f"Hook took {elapsed_ms:.0f}ms"
 
 
+class TestDetectWorktreeInfo:
+    def test_normal_path(self) -> None:
+        from hooks.emit_event import detect_worktree_info
+
+        project, worktree = detect_worktree_info("/Users/nico/dev/monitorator")
+        assert project == "monitorator"
+        assert worktree is None
+
+    def test_worktree_path(self) -> None:
+        from hooks.emit_event import detect_worktree_info
+
+        project, worktree = detect_worktree_info(
+            "/Users/nico/dev/monitorator/.claude/worktrees/PIPED-SEEKING-OAS"
+        )
+        assert project == "monitorator"
+        assert worktree == "PIPED-SEEKING-OAS"
+
+    def test_worktree_path_with_trailing_slash(self) -> None:
+        from hooks.emit_event import detect_worktree_info
+
+        project, worktree = detect_worktree_info(
+            "/Users/nico/dev/monitorator/.claude/worktrees/PIPED-SEEKING-OAS/"
+        )
+        assert project == "monitorator"
+        assert worktree == "PIPED-SEEKING-OAS"
+
+    def test_empty_string(self) -> None:
+        from hooks.emit_event import detect_worktree_info
+
+        project, worktree = detect_worktree_info("")
+        assert project == "unknown"
+        assert worktree is None
+
+    def test_worktree_sets_fields_in_hook(self, tmp_sessions_dir: Path) -> None:
+        event = {
+            "type": "SessionStart",
+            "session_id": "wt-001",
+            "cwd": "/Users/nico/dev/monitorator/.claude/worktrees/PIPED-SEEKING-OAS",
+        }
+        result = run_hook(event, tmp_sessions_dir)
+        assert result.returncode == 0
+        data = json.loads((tmp_sessions_dir / "wt-001.json").read_text())
+        assert data["project_name"] == "monitorator"
+        assert data["worktree_name"] == "PIPED-SEEKING-OAS"
+        assert data["is_worktree"] is True
+
+    def test_dot_worktrees_path(self) -> None:
+        from hooks.emit_event import detect_worktree_info
+
+        project, worktree = detect_worktree_info(
+            "/Users/nico/dev/creci/creci-platform/.worktrees/onboarding-restructure"
+        )
+        assert project == "creci-platform"
+        assert worktree == "onboarding-restructure"
+
+    def test_dot_worktrees_path_with_trailing_slash(self) -> None:
+        from hooks.emit_event import detect_worktree_info
+
+        project, worktree = detect_worktree_info(
+            "/Users/nico/dev/proj/.worktrees/my-feature/"
+        )
+        assert project == "proj"
+        assert worktree == "my-feature"
+
+    def test_dot_worktrees_hook_integration(self, tmp_sessions_dir: Path) -> None:
+        event = {
+            "type": "SessionStart",
+            "session_id": "wt-003",
+            "cwd": "/Users/nico/dev/myproject/.worktrees/onboarding-restructure",
+        }
+        result = run_hook(event, tmp_sessions_dir)
+        assert result.returncode == 0
+        data = json.loads((tmp_sessions_dir / "wt-003.json").read_text())
+        assert data["project_name"] == "myproject"
+        assert data["worktree_name"] == "onboarding-restructure"
+        assert data["is_worktree"] is True
+
+    def test_normal_path_no_worktree_fields(self, tmp_sessions_dir: Path) -> None:
+        event = {
+            "type": "SessionStart",
+            "session_id": "wt-002",
+            "cwd": "/Users/nico/dev/monitorator",
+        }
+        result = run_hook(event, tmp_sessions_dir)
+        assert result.returncode == 0
+        data = json.loads((tmp_sessions_dir / "wt-002.json").read_text())
+        assert data["project_name"] == "monitorator"
+        assert data["worktree_name"] is None
+        assert data["is_worktree"] is False
+
+
 class TestIsSystemMessage:
     def test_task_notification_is_system(self) -> None:
         from hooks.emit_event import _is_system_message

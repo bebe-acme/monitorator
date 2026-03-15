@@ -31,6 +31,8 @@ class SessionState:
     last_prompt_summary: Optional[str] = None
     subagent_count: int = 0
     permission_mode: Optional[str] = None
+    is_worktree: bool = False
+    worktree_name: Optional[str] = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -47,6 +49,8 @@ class SessionState:
             "last_prompt_summary": self.last_prompt_summary,
             "subagent_count": self.subagent_count,
             "permission_mode": self.permission_mode,
+            "is_worktree": self.is_worktree,
+            "worktree_name": self.worktree_name,
         }
 
     @classmethod
@@ -71,6 +75,8 @@ class SessionState:
             last_prompt_summary=d.get("last_prompt_summary") if d.get("last_prompt_summary") is not None else None,  # type: ignore[arg-type]
             subagent_count=int(d.get("subagent_count", 0)),  # type: ignore[arg-type]
             permission_mode=d.get("permission_mode") if d.get("permission_mode") is not None else None,  # type: ignore[arg-type]
+            is_worktree=bool(d.get("is_worktree", False)),
+            worktree_name=d.get("worktree_name") if d.get("worktree_name") is not None else None,  # type: ignore[arg-type]
         )
 
 
@@ -104,6 +110,18 @@ class MergedSession:
         if self.process_info:
             return time.time() - self.process_info.elapsed_seconds
         return 0.0
+
+    @property
+    def is_worktree(self) -> bool:
+        if self.hook_state:
+            return self.hook_state.is_worktree
+        return False
+
+    @property
+    def worktree_name(self) -> str | None:
+        if self.hook_state:
+            return self.hook_state.worktree_name
+        return None
 
     @property
     def project_name(self) -> str:
