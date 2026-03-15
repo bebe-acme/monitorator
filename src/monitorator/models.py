@@ -99,6 +99,7 @@ class SessionState:
 class ProcessInfo:
     pid: int
     cpu_percent: float
+    memory_mb: float
     elapsed_seconds: int
     cwd: str
     command: str

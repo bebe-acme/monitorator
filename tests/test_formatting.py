@@ -47,6 +47,7 @@ def make_merged(
         process_info=ProcessInfo(
             pid=12345,
             cpu_percent=cpu,
+            memory_mb=0.0,
             elapsed_seconds=elapsed,
             cwd=effective_cwd,
             command="claude",
@@ -77,6 +78,38 @@ class TestFormatElapsed:
         from monitorator.tui.formatting import format_elapsed
 
         assert format_elapsed(0) == "0m 00s"
+
+
+class TestFormatMemory:
+    def test_megabytes(self) -> None:
+        from monitorator.tui.formatting import format_memory
+
+        assert format_memory(256.0) == "256MB"
+
+    def test_megabytes_rounds(self) -> None:
+        from monitorator.tui.formatting import format_memory
+
+        assert format_memory(256.7) == "257MB"
+
+    def test_gigabytes(self) -> None:
+        from monitorator.tui.formatting import format_memory
+
+        assert format_memory(1024.0) == "1.0GB"
+
+    def test_gigabytes_fractional(self) -> None:
+        from monitorator.tui.formatting import format_memory
+
+        assert format_memory(2560.0) == "2.5GB"
+
+    def test_zero(self) -> None:
+        from monitorator.tui.formatting import format_memory
+
+        assert format_memory(0.0) == "0MB"
+
+    def test_just_below_gb(self) -> None:
+        from monitorator.tui.formatting import format_memory
+
+        assert format_memory(1023.0) == "1023MB"
 
 
 class TestStatusDicts:

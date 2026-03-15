@@ -8,7 +8,7 @@ from monitorator.context_size import get_context_estimate
 from monitorator.models import MergedSession
 from monitorator.project_metadata import get_project_description
 from monitorator.session_prompt import get_session_prompt
-from monitorator.tui.formatting import STATUS_ICONS, STATUS_COLORS, format_elapsed
+from monitorator.tui.formatting import STATUS_ICONS, STATUS_COLORS, format_elapsed, format_memory
 
 
 def _shorten_path(path: str, max_length: int = 55) -> str:
@@ -81,6 +81,7 @@ class DetailPanel(Static):
         project = s.project_name
         pid = str(s.process_info.pid) if s.process_info else "-"
         cpu = f"{s.process_info.cpu_percent:.0f}%" if s.process_info else "-"
+        ram = format_memory(s.process_info.memory_mb) if s.process_info else "-"
         elapsed = format_elapsed(s.process_info.elapsed_seconds) if s.process_info else "-"
         branch = s.hook_state.git_branch if s.hook_state and s.hook_state.git_branch else "-"
         cwd_raw = s.hook_state.cwd if s.hook_state else (s.process_info.cwd if s.process_info else "-")
@@ -120,6 +121,8 @@ class DetailPanel(Static):
             f"[#555555]PID [/][#cccccc]{pid}[/]"
             f"       "
             f"[#555555]CPU [/][#cccccc]{cpu}[/]"
+            f"       "
+            f"[#555555]RAM [/][#cccccc]{ram}[/]"
             f"       "
             f"[#555555]\u23f1 [/][#cccccc]{elapsed}[/]"
             f"       "

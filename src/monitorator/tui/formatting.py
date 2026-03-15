@@ -107,6 +107,13 @@ def shorten_path(path: str) -> str:
     return result
 
 
+def format_memory(mb: float) -> str:
+    """Format memory in MB to human-readable string (MB or GB)."""
+    if mb >= 1024:
+        return f"{mb / 1024:.1f}GB"
+    return f"{mb:.0f}MB"
+
+
 def format_elapsed(seconds: int) -> str:
     """Format elapsed seconds into human-readable string."""
     if seconds >= 3600:

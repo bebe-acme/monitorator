@@ -35,6 +35,7 @@ def make_merged(
     tool_summary: str | None = "file_path: src/app.py",
     prompt: str | None = "Build the monitor",
     cpu: float = 20.0,
+    memory_mb: float = 0.0,
     elapsed: int = 300,
     stale: bool = False,
     subagent_count: int = 0,
@@ -66,6 +67,7 @@ def make_merged(
         process_info=ProcessInfo(
             pid=12345,
             cpu_percent=cpu,
+            memory_mb=memory_mb,
             elapsed_seconds=elapsed,
             cwd=effective_cwd,
             command="claude",
@@ -160,6 +162,17 @@ class TestSessionRowContent:
         lines = content.strip().split("\n")
         assert "45%" in lines[3]  # line 4 (index 3)
         assert "45%" not in lines[0]  # NOT on line 1
+
+    def test_contains_ram_on_line4(self) -> None:
+        """RAM appears on line 4 (index 3) with MB suffix."""
+        from monitorator.tui.session_row import SessionRow
+
+        session = make_merged(memory_mb=256.0)
+        row = SessionRow(session)
+        content = row._build_content()
+        lines = content.strip().split("\n")
+        assert "256MB" in lines[3]  # line 4 (index 3)
+        assert "256MB" not in lines[0]  # NOT on line 1
 
     def test_contains_elapsed_on_line4(self) -> None:
         """Elapsed time appears on line 4 (index 3)."""

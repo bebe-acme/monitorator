@@ -29,21 +29,31 @@ class TestParseElapsed:
 class TestParsePsOutput:
     def test_typical_output(self) -> None:
         output = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "12345  21.3     05:30 ttys003  node /path/to/claude\n"
-            "12346   0.5     10:00 ttys004  node /path/to/claude\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "12345  21.3 262144     05:30 ttys003  node /path/to/claude\n"
+            "12346   0.5 131072     10:00 ttys004  node /path/to/claude\n"
         )
         results = parse_ps_output(output)
         assert len(results) == 2
         assert results[0]["pid"] == 12345
         assert results[0]["cpu"] == 21.3
+        assert results[0]["rss_kb"] == 262144
         assert results[0]["elapsed_str"] == "05:30"
         assert results[0]["tty"] == "ttys003"
 
+    def test_rss_parsed_as_integer(self) -> None:
+        output = (
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "12345  10.0 524288     03:00 ttys001  node /path/to/claude\n"
+        )
+        results = parse_ps_output(output)
+        assert len(results) == 1
+        assert results[0]["rss_kb"] == 524288
+
     def test_no_tty(self) -> None:
         output = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "12345  21.3     05:30 ?        node /path/to/claude\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "12345  21.3 262144     05:30 ?        node /path/to/claude\n"
         )
         results = parse_ps_output(output)
         assert len(results) == 1
@@ -51,13 +61,13 @@ class TestParsePsOutput:
 
     def test_empty_output(self) -> None:
         assert parse_ps_output("") == []
-        assert parse_ps_output("  PID  %CPU   ELAPSED TT       COMMAND\n") == []
+        assert parse_ps_output("  PID  %CPU    RSS   ELAPSED TT       COMMAND\n") == []
 
     def test_malformed_line_skipped(self) -> None:
         output = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
             "not a valid line\n"
-            "12345  21.3     05:30 ttys003  node claude\n"
+            "12345  21.3 262144     05:30 ttys003  node claude\n"
         )
         results = parse_ps_output(output)
         assert len(results) == 1
@@ -66,8 +76,8 @@ class TestParsePsOutput:
 class TestProcessScanner:
     def test_scan_returns_process_info_list(self) -> None:
         mock_ps = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "12345  21.3     05:30 ttys003  node /Users/testuser/.claude/local/claude\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "12345  21.3 262144     05:30 ttys003  node /Users/testuser/.claude/local/claude\n"
         )
         mock_lsof = "p12345\nf4\nn/Users/testuser/projects/agentator\n"
 
@@ -83,11 +93,12 @@ class TestProcessScanner:
         assert isinstance(info, ProcessInfo)
         assert info.pid == 12345
         assert info.cpu_percent == 21.3
+        assert info.memory_mb == pytest.approx(262144 / 1024.0)
         assert info.elapsed_seconds == 330
 
     def test_scan_empty_when_no_processes(self) -> None:
         scanner = ProcessScanner()
-        with patch.object(scanner, "_run_ps", return_value="  PID  %CPU   ELAPSED TT       COMMAND\n"):
+        with patch.object(scanner, "_run_ps", return_value="  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"):
             results = scanner.scan()
         assert results == []
 
@@ -100,8 +111,8 @@ class TestProcessScanner:
     def test_excludes_chrome_native_host(self) -> None:
         """Chrome extension native host should not be detected as Claude."""
         mock_ps = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "55555  0.1     10:00 ttys000  /Users/testuser/.claude/local/claude --chrome-native-host\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "55555  0.1 10240     10:00 ttys000  /Users/testuser/.claude/local/claude --chrome-native-host\n"
         )
         scanner = ProcessScanner()
         with (
@@ -114,8 +125,8 @@ class TestProcessScanner:
     def test_includes_real_claude_process(self) -> None:
         """Real Claude Code process should be detected."""
         mock_ps = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "12345  21.3     05:30 ttys003  /Users/testuser/.claude/local/claude\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "12345  21.3 262144     05:30 ttys003  /Users/testuser/.claude/local/claude\n"
         )
         mock_lsof = "p12345\nn/Users/testuser/projects/agentator\n"
         scanner = ProcessScanner()
@@ -129,8 +140,8 @@ class TestProcessScanner:
     def test_includes_claude_code_binary(self) -> None:
         """Binary named claude-code should be detected."""
         mock_ps = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "12345  5.0     02:00 ttys001  /usr/local/bin/claude-code --some-flag\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "12345  5.0 51200     02:00 ttys001  /usr/local/bin/claude-code --some-flag\n"
         )
         scanner = ProcessScanner()
         with (
@@ -143,10 +154,10 @@ class TestProcessScanner:
     def test_excludes_claude_desktop_app(self) -> None:
         """Claude Desktop app processes should not be detected as Claude CLI."""
         mock_ps = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "44444  0.0  4-02:15:00 ?        /Applications/Claude.app/Contents/MacOS/Claude\n"
-            "44445  0.0  4-02:15:00 ?        /Applications/Claude.app/Contents/Frameworks/Claude Helper (GPU).app/Contents/MacOS/Claude Helper (GPU) --type=gpu-process\n"
-            "44446  0.0  4-02:15:00 ?        /Applications/Claude.app/Contents/Frameworks/Claude Helper (Renderer).app/Contents/MacOS/Claude Helper (Renderer) --type=renderer\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "44444  0.0 102400  4-02:15:00 ?        /Applications/Claude.app/Contents/MacOS/Claude\n"
+            "44445  0.0 102400  4-02:15:00 ?        /Applications/Claude.app/Contents/Frameworks/Claude Helper (GPU).app/Contents/MacOS/Claude Helper (GPU) --type=gpu-process\n"
+            "44446  0.0 102400  4-02:15:00 ?        /Applications/Claude.app/Contents/Frameworks/Claude Helper (Renderer).app/Contents/MacOS/Claude Helper (Renderer) --type=renderer\n"
         )
         scanner = ProcessScanner()
         with (
@@ -159,8 +170,8 @@ class TestProcessScanner:
     def test_excludes_unrelated_claude_substring(self) -> None:
         """A process that merely contains 'claude' in path but isn't Claude binary."""
         mock_ps = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "99999  1.0     01:00 ttys005  /usr/bin/python /home/claude-user/scripts/server.py\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "99999  1.0 20480     01:00 ttys005  /usr/bin/python /home/claude-user/scripts/server.py\n"
         )
         scanner = ProcessScanner()
         with (
@@ -172,8 +183,8 @@ class TestProcessScanner:
 
     def test_cwd_fallback_when_lsof_fails(self) -> None:
         mock_ps = (
-            "  PID  %CPU   ELAPSED TT       COMMAND\n"
-            "99999  5.0     01:00 ttys002  node /path/claude\n"
+            "  PID  %CPU    RSS   ELAPSED TT       COMMAND\n"
+            "99999  5.0 10240     01:00 ttys002  node /path/claude\n"
         )
         scanner = ProcessScanner()
         with (
