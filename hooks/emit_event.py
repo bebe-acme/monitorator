@@ -142,7 +142,7 @@ def main() -> None:
     state: dict[str, object] = {
         "session_id": session_id,
         "cwd": effective_cwd_val,
-        "project_name": existing.get("project_name") or wt_project,
+        "project_name": wt_project,
         "status": existing.get("status", "unknown"),
         "last_event": event_type,
         "timestamp": existing.get("timestamp", now),
@@ -166,7 +166,6 @@ def main() -> None:
     if event_type == "SessionStart":
         state["status"] = "idle"
         state["timestamp"] = now
-        state["project_name"] = wt_project
 
     elif event_type == "UserPromptSubmit":
         state["status"] = "thinking"
