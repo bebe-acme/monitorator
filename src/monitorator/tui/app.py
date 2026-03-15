@@ -323,9 +323,118 @@ class MonitoratorApp(App[None]):
     def action_open_terminal(self) -> None:
         focused = self.focused
         if isinstance(focused, SessionRow):
-            session = focused.session
-            if session.process_info:
-                open_terminal_for_pid(session.process_info.pid)
+            self._focus_terminal(focused.session_id)
+
+    def _focus_terminal(self, session_id: str) -> None:
+        """Look up session by ID and focus its terminal window."""
+        import datetime
+        debug_path = "/tmp/monitorator-focus-debug.log"
+        def _dbg(msg: str) -> None:
+            with open(debug_path, "a") as f:
+                f.write(f"{datetime.datetime.now().isoformat()} {msg}\n")
+
+        _dbg(f"called with session_id={session_id}")
+        session = self._previous.get(session_id)
+        if session is None:
+            _dbg("session not found in self._previous")
+            self.notify("Session not found", severity="warning")
+            return
+        _dbg(f"session found: project={session.project_name} status={session.effective_status} has_proc={session.process_info is not None}")
+        if session.effective_status == SessionStatus.TERMINATED:
+            self.notify("Session already terminated", severity="warning")
+            return
+
+        pid: int | None = None
+        if session.process_info:
+            pid = session.process_info.pid
+            _dbg(f"process_info PID={pid} TTY={session.process_info.tty}")
+        else:
+            _dbg(f"no process_info, trying cwd lookup. hook_cwd={session.hook_state.cwd if session.hook_state else None}")
+            pid = self._find_pid_by_cwd(session)
+            _dbg(f"cwd lookup returned PID={pid}")
+
+        if pid is None:
+            _dbg("no PID found, giving up")
+            self.notify("No process for session", severity="warning")
+            return
+
+        from monitorator.terminal_opener import get_tty_for_pid
+        tty = get_tty_for_pid(pid)
+        _dbg(f"get_tty_for_pid({pid}) = {tty}")
+
+        result = open_terminal_for_pid(pid)
+        _dbg(f"open_terminal_for_pid returned {result}")
+        if result:
+            self.notify(f"Focused: {session.project_name}")
+        else:
+            self.notify("Could not activate terminal", severity="warning")
+
+    def _find_pid_by_cwd(self, session: MergedSession) -> int | None:
+        """Find a Claude process PID by matching the session's cwd."""
+        cwd = session.hook_state.cwd if session.hook_state else None
+        if not cwd:
+            return None
+        # Expand ~ to full path
+        if cwd.startswith("~"):
+            cwd = os.path.expanduser(cwd)
+        try:
+            ps_result = subprocess.run(
+                ["ps", "-eo", "pid,command"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if ps_result.returncode != 0:
+                return None
+        except (subprocess.TimeoutExpired, OSError):
+            return None
+
+        # Find Claude PIDs
+        claude_pids: list[int] = []
+        for line in ps_result.stdout.strip().split("\n")[1:]:
+            parts = line.split(None, 1)
+            if len(parts) < 2:
+                continue
+            try:
+                pid = int(parts[0])
+            except ValueError:
+                continue
+            cmd = parts[1].lower()
+            cmd_tokens = parts[1].split()
+            for token in cmd_tokens:
+                if token.startswith("-"):
+                    continue
+                basename = token.rsplit("/", 1)[-1].lower()
+                if basename in ("claude", "claude-code"):
+                    claude_pids.append(pid)
+                    break
+
+        # Check each Claude process's cwd via lsof
+        for pid in claude_pids:
+            try:
+                lsof_result = subprocess.run(
+                    ["lsof", "-p", str(pid), "-Fn"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                proc_cwd = ""
+                in_cwd = False
+                for line in lsof_result.stdout.strip().split("\n"):
+                    if line == "fcwd":
+                        in_cwd = True
+                        continue
+                    if in_cwd and line.startswith("n/"):
+                        proc_cwd = line[1:]
+                        break
+                    if line.startswith("f"):
+                        in_cwd = False
+                if proc_cwd.rstrip("/") == cwd.rstrip("/"):
+                    return pid
+            except (subprocess.TimeoutExpired, OSError):
+                continue
+
+        return None
 
     def action_cursor_down(self) -> None:
         self._focus_adjacent_row(direction=1)
@@ -363,7 +472,17 @@ class MonitoratorApp(App[None]):
             self._show_detail(focused.session_id, focus_dropdown=True)
 
     def on_session_row_selected(self, event: SessionRow.Selected) -> None:
+        """Handle click on a session row: show detail panel and focus terminal.
+
+        Click shows detail + dropdown (no focus) and activates the terminal.
+        Enter (action_select_session) shows detail + dropdown with focus, but
+        does not activate the terminal.
+        """
+        import datetime
+        with open("/tmp/monitorator-focus-debug.log", "a") as f:
+            f.write(f"{datetime.datetime.now().isoformat()} on_session_row_selected called, sid={event.session_id}\n")
         self._show_detail(event.session_id)
+        self._focus_terminal(event.session_id)
 
     def action_close_dropdown(self) -> None:
         """Close the dropdown for the currently focused session row."""

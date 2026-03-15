@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Monitorator hook for Claude Code.
 Reads event JSON from stdin, writes session state to ~/.monitorator/sessions/.
 
 STDLIB ONLY - no third-party imports. Must complete <100ms.
 """
+
 import json
 import os
 import re

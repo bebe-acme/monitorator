@@ -48,7 +48,7 @@ def parse_ps_output(output: str) -> list[dict[str, object]]:
             continue
         try:
             pid = int(parts[0])
-            cpu = float(parts[1])
+            cpu = float(parts[1].replace(",", "."))
             rss_kb = int(parts[2])
             elapsed_str = parts[3]
             tty = parts[4]

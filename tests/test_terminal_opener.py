@@ -9,6 +9,10 @@ from monitorator.terminal_opener import (
     get_tty_for_pid,
     activate_terminal_for_tty,
     open_terminal_for_pid,
+    _activate_ghostty_tab,
+    _activate_iterm2_tab,
+    _activate_terminal_app_tab,
+    _find_terminal_app_for_tty,
 )
 
 
@@ -57,48 +61,56 @@ class TestGetTtyForPid:
 
 
 class TestActivateTerminalForTty:
-    def test_tries_ghostty_first(self) -> None:
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+    def test_dispatches_to_ghostty_when_detected(self) -> None:
+        with patch("monitorator.terminal_opener._find_terminal_app_for_tty", return_value="Ghostty"), \
+             patch("monitorator.terminal_opener._activate_ghostty_tab", return_value=True) as mock_ghostty:
             result = activate_terminal_for_tty("ttys003")
             assert result is True
-            call_args = mock_run.call_args
-            assert call_args[0][0][0] == "osascript"
-            assert "Ghostty" in call_args[0][0][2]
+            mock_ghostty.assert_called_once_with("ttys003")
 
-    def test_falls_back_to_iterm(self) -> None:
-        with patch("subprocess.run") as mock_run:
-            # First call (Ghostty) fails, second (iTerm) succeeds
-            mock_run.side_effect = [
-                MagicMock(returncode=1),
-                MagicMock(returncode=0),
-            ]
+    def test_dispatches_to_iterm_when_detected(self) -> None:
+        with patch("monitorator.terminal_opener._find_terminal_app_for_tty", return_value="iTerm2"), \
+             patch("monitorator.terminal_opener._activate_iterm2_tab", return_value=True) as mock_iterm:
             result = activate_terminal_for_tty("ttys003")
             assert result is True
-            assert mock_run.call_count == 2
+            mock_iterm.assert_called_once_with("ttys003")
+
+    def test_dispatches_to_terminal_app_when_detected(self) -> None:
+        with patch("monitorator.terminal_opener._find_terminal_app_for_tty", return_value="Terminal"), \
+             patch("monitorator.terminal_opener._activate_terminal_app_tab", return_value=True) as mock_term:
+            result = activate_terminal_for_tty("ttys003")
+            assert result is True
+            mock_term.assert_called_once_with("ttys003")
+
+    def test_falls_back_to_iterm_when_ghostty_fails(self) -> None:
+        with patch("monitorator.terminal_opener._find_terminal_app_for_tty", return_value=None), \
+             patch("monitorator.terminal_opener._activate_ghostty_tab", return_value=False), \
+             patch("monitorator.terminal_opener._activate_iterm2_tab", return_value=True) as mock_iterm:
+            result = activate_terminal_for_tty("ttys003")
+            assert result is True
+            mock_iterm.assert_called_once_with("ttys003")
 
     def test_falls_back_to_terminal_app(self) -> None:
-        with patch("subprocess.run") as mock_run:
-            # Ghostty and iTerm fail, Terminal.app succeeds
-            mock_run.side_effect = [
-                MagicMock(returncode=1),
-                MagicMock(returncode=1),
-                MagicMock(returncode=0),
-            ]
+        with patch("monitorator.terminal_opener._find_terminal_app_for_tty", return_value=None), \
+             patch("monitorator.terminal_opener._activate_ghostty_tab", return_value=False), \
+             patch("monitorator.terminal_opener._activate_iterm2_tab", return_value=False), \
+             patch("monitorator.terminal_opener._activate_terminal_app_tab", return_value=True) as mock_term:
             result = activate_terminal_for_tty("ttys003")
             assert result is True
-            assert mock_run.call_count == 3
+            mock_term.assert_called_once_with("ttys003")
 
     def test_returns_false_when_all_fail(self) -> None:
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1)
+        with patch("monitorator.terminal_opener._find_terminal_app_for_tty", return_value=None), \
+             patch("monitorator.terminal_opener._activate_ghostty_tab", return_value=False), \
+             patch("monitorator.terminal_opener._activate_iterm2_tab", return_value=False), \
+             patch("monitorator.terminal_opener._activate_terminal_app_tab", return_value=False):
             result = activate_terminal_for_tty("ttys003")
             assert result is False
 
-    def test_returns_false_on_exception(self) -> None:
-        with patch("subprocess.run", side_effect=OSError("no osascript")):
-            result = activate_terminal_for_tty("ttys003")
-            assert result is False
+    def test_propagates_exception_from_detection(self) -> None:
+        with patch("monitorator.terminal_opener._find_terminal_app_for_tty", side_effect=OSError("no ps")):
+            with pytest.raises(OSError):
+                activate_terminal_for_tty("ttys003")
 
 
 class TestOpenTerminalForPid:
