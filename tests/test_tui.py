@@ -38,6 +38,7 @@ def make_merged(
         process_info=ProcessInfo(
             pid=12345,
             cpu_percent=cpu,
+            memory_mb=0.0,
             elapsed_seconds=300,
             cwd=f"/tmp/{project.lower()}",
             command="claude",
@@ -188,6 +189,7 @@ class TestRefreshStaleOverride:
             process_info=ProcessInfo(
                 pid=99999,
                 cpu_percent=5.0,
+                memory_mb=0.0,
                 elapsed_seconds=600,
                 cwd="/tmp/proj",
                 command="claude",
@@ -228,6 +230,7 @@ class TestRefreshStaleOverride:
             process_info=ProcessInfo(
                 pid=99998,
                 cpu_percent=50.0,
+                memory_mb=0.0,
                 elapsed_seconds=120,
                 cwd="/tmp/proj",
                 command="claude",
@@ -268,6 +271,7 @@ class TestRefreshStaleOverride:
             process_info=ProcessInfo(
                 pid=99997,
                 cpu_percent=5.0,
+                memory_mb=0.0,
                 elapsed_seconds=600,
                 cwd="/tmp/proj",
                 command="claude",

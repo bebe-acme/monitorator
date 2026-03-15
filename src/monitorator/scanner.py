@@ -44,17 +44,19 @@ def parse_ps_output(output: str) -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
     for line in lines[1:]:
         parts = line.split()
-        if len(parts) < 5:
+        if len(parts) < 6:
             continue
         try:
             pid = int(parts[0])
             cpu = float(parts[1])
-            elapsed_str = parts[2]
-            tty = parts[3]
-            command = " ".join(parts[4:])
+            rss_kb = int(parts[2])
+            elapsed_str = parts[3]
+            tty = parts[4]
+            command = " ".join(parts[5:])
             results.append({
                 "pid": pid,
                 "cpu": cpu,
+                "rss_kb": rss_kb,
                 "elapsed_str": elapsed_str,
                 "tty": tty if tty != "?" else None,
                 "command": command,
@@ -69,7 +71,7 @@ class ProcessScanner:
 
     def _run_ps(self) -> str:
         result = subprocess.run(
-            ["ps", "-eo", "pid,%cpu,etime,tty,command"],
+            ["ps", "-eo", "pid,%cpu,rss,etime,tty,command"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -191,6 +193,7 @@ class ProcessScanner:
             results.append(ProcessInfo(
                 pid=pid,
                 cpu_percent=float(entry["cpu"]),  # type: ignore[arg-type]
+                memory_mb=int(entry["rss_kb"]) / 1024.0,  # type: ignore[arg-type]
                 elapsed_seconds=parse_elapsed(str(entry["elapsed_str"])),
                 cwd=cwd,
                 command=command,

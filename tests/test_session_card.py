@@ -46,6 +46,7 @@ def make_merged(
         process_info=ProcessInfo(
             pid=12345,
             cpu_percent=cpu,
+            memory_mb=0.0,
             elapsed_seconds=elapsed,
             cwd=f"/tmp/{project.lower()}",
             command="claude",
@@ -199,7 +200,7 @@ class TestSessionRowRendering:
             session_id="proc-999",
             hook_state=None,
             process_info=ProcessInfo(
-                pid=999, cpu_percent=2.0, elapsed_seconds=60,
+                pid=999, cpu_percent=2.0, memory_mb=0.0, elapsed_seconds=60,
                 cwd="/tmp/myproject", command="claude",
             ),
             effective_status=SessionStatus.IDLE,

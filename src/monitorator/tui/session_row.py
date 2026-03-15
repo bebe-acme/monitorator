@@ -18,6 +18,7 @@ from monitorator.tui.formatting import (
     STATUS_LABELS,
     format_activity,
     format_elapsed,
+    format_memory,
 )
 from monitorator.tui.sprites import get_sprite_color, get_sprite_frame, sprite_index_for_session
 
@@ -214,6 +215,11 @@ class SessionRow(Widget, can_focus=True):
             if s.process_info
             else "-"
         )
+        ram = (
+            format_memory(s.process_info.memory_mb)
+            if s.process_info
+            else "-"
+        )
         elapsed = (
             format_elapsed(s.process_info.elapsed_seconds)
             if s.process_info
@@ -310,7 +316,7 @@ class SessionRow(Widget, can_focus=True):
         if status == SessionStatus.WAITING_PERMISSION:
             line4 = f"    [bold #ff3333 blink]\u26a0 NEEDS HUMAN INTERVENTION[/]"
         else:
-            line4 = f"    [#555555]{cpu:>5s}[/]  [#444444]{elapsed}[/]"
+            line4 = f"    [#555555]{cpu:>5s}[/]  [#555555]{ram:>6s}[/]  [#444444]{elapsed}[/]"
             if show_ctx:
                 line4 += f"  [#888888]{ctx:>6s}[/]"
 

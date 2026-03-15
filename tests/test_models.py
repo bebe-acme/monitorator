@@ -127,6 +127,7 @@ class TestProcessInfo:
         info = ProcessInfo(
             pid=12345,
             cpu_percent=21.5,
+            memory_mb=0.0,
             elapsed_seconds=300,
             cwd="/tmp/project",
             command="claude",
@@ -137,13 +138,13 @@ class TestProcessInfo:
 
     def test_session_uuid_default_none(self) -> None:
         info = ProcessInfo(
-            pid=1, cpu_percent=0.0, elapsed_seconds=0, cwd="/tmp", command="claude",
+            pid=1, cpu_percent=0.0, memory_mb=0.0, elapsed_seconds=0, cwd="/tmp", command="claude",
         )
         assert info.session_uuid is None
 
     def test_session_uuid_set(self) -> None:
         info = ProcessInfo(
-            pid=1, cpu_percent=0.0, elapsed_seconds=0, cwd="/tmp", command="claude",
+            pid=1, cpu_percent=0.0, memory_mb=0.0, elapsed_seconds=0, cwd="/tmp", command="claude",
             session_uuid="abc-def-123",
         )
         assert info.session_uuid == "abc-def-123"
@@ -152,7 +153,7 @@ class TestProcessInfo:
 class TestMergedSession:
     def test_create_with_both(self) -> None:
         state = SessionState(session_id="m-1", cwd="/tmp", status=SessionStatus.IDLE)
-        proc = ProcessInfo(pid=100, cpu_percent=5.0, elapsed_seconds=60, cwd="/tmp", command="claude")
+        proc = ProcessInfo(pid=100, cpu_percent=5.0, memory_mb=0.0, elapsed_seconds=60, cwd="/tmp", command="claude")
         merged = MergedSession(
             session_id="m-1",
             hook_state=state,
@@ -179,7 +180,7 @@ class TestMergedSession:
         assert merged.is_stale
 
     def test_create_process_only(self) -> None:
-        proc = ProcessInfo(pid=200, cpu_percent=50.0, elapsed_seconds=120, cwd="/tmp", command="claude")
+        proc = ProcessInfo(pid=200, cpu_percent=50.0, memory_mb=0.0, elapsed_seconds=120, cwd="/tmp", command="claude")
         merged = MergedSession(
             session_id="p-1",
             hook_state=None,
@@ -202,7 +203,7 @@ class TestMergedSession:
         assert merged.project_name == "MyProj"
 
     def test_project_name_from_cwd_fallback(self) -> None:
-        proc = ProcessInfo(pid=300, cpu_percent=0.0, elapsed_seconds=10, cwd="/tmp/fallback-proj", command="claude")
+        proc = ProcessInfo(pid=300, cpu_percent=0.0, memory_mb=0.0, elapsed_seconds=10, cwd="/tmp/fallback-proj", command="claude")
         merged = MergedSession(
             session_id="fb-1",
             hook_state=None,
@@ -214,7 +215,7 @@ class TestMergedSession:
 
     def test_project_name_from_worktree_cwd_fallback(self) -> None:
         proc = ProcessInfo(
-            pid=400, cpu_percent=0.0, elapsed_seconds=10,
+            pid=400, cpu_percent=0.0, memory_mb=0.0, elapsed_seconds=10,
             cwd="/Users/nico/dev/myapp/.claude/worktrees/BOLD-OAK-A3F2",
             command="claude",
         )
@@ -336,7 +337,7 @@ class TestMergedSessionLastInteractionTime:
         assert merged.last_interaction_time == 3000.0
 
     def test_hookless_uses_process_elapsed(self) -> None:
-        proc = ProcessInfo(pid=1, cpu_percent=0.0, elapsed_seconds=600, cwd="/tmp", command="claude")
+        proc = ProcessInfo(pid=1, cpu_percent=0.0, memory_mb=0.0, elapsed_seconds=600, cwd="/tmp", command="claude")
         merged = MergedSession(
             session_id="t3",
             hook_state=None,
