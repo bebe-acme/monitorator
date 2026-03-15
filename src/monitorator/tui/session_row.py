@@ -258,6 +258,12 @@ class SessionRow(Widget, can_focus=True):
         # Pad to keep alignment (badge has 2 extra chars from ▐▌ + spaces)
         pad_needed = max(0, proj_w - len(project) - 2)
         line1_parts += " " * pad_needed
+        # Worktree indicator
+        if s.is_worktree and s.worktree_name:
+            wt_name = s.worktree_name.lower()
+            if len(wt_name) > 20:
+                wt_name = wt_name[:19] + "\u2026"
+            line1_parts += f"  [dim #8a8a8a]\U0001f33f {wt_name}[/]"
         if show_branch:
             line1_parts += f"  [#3399ff]{branch:<10s}[/]"
 

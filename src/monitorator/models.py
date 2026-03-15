@@ -6,6 +6,21 @@ from enum import Enum
 from typing import Optional
 
 
+_WORKTREE_MARKERS = ("/.claude/worktrees/", "/.worktrees/")
+
+
+def _worktree_info_from_cwd(cwd: str) -> tuple[str, str | None]:
+    """Extract (project_name, worktree_name) from cwd, resolving worktree paths."""
+    cleaned = cwd.rstrip("/")
+    for marker in _WORKTREE_MARKERS:
+        idx = cleaned.find(marker)
+        if idx != -1:
+            project = cleaned[:idx].rsplit("/", 1)[-1] or "unknown"
+            worktree = cleaned[idx + len(marker):].split("/", 1)[0]
+            return (project, worktree if worktree else None)
+    return (cleaned.rsplit("/", 1)[-1] or "unknown", None)
+
+
 class SessionStatus(Enum):
     IDLE = "idle"
     THINKING = "thinking"
@@ -31,6 +46,8 @@ class SessionState:
     last_prompt_summary: Optional[str] = None
     subagent_count: int = 0
     permission_mode: Optional[str] = None
+    is_worktree: bool = False
+    worktree_name: Optional[str] = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -47,6 +64,8 @@ class SessionState:
             "last_prompt_summary": self.last_prompt_summary,
             "subagent_count": self.subagent_count,
             "permission_mode": self.permission_mode,
+            "is_worktree": self.is_worktree,
+            "worktree_name": self.worktree_name,
         }
 
     @classmethod
@@ -71,6 +90,8 @@ class SessionState:
             last_prompt_summary=d.get("last_prompt_summary") if d.get("last_prompt_summary") is not None else None,  # type: ignore[arg-type]
             subagent_count=int(d.get("subagent_count", 0)),  # type: ignore[arg-type]
             permission_mode=d.get("permission_mode") if d.get("permission_mode") is not None else None,  # type: ignore[arg-type]
+            is_worktree=bool(d.get("is_worktree", False)),
+            worktree_name=d.get("worktree_name") if d.get("worktree_name") is not None else None,  # type: ignore[arg-type]
         )
 
 
@@ -106,14 +127,35 @@ class MergedSession:
         return 0.0
 
     @property
+    def _cwd(self) -> str | None:
+        if self.hook_state:
+            return self.hook_state.cwd
+        if self.process_info:
+            return self.process_info.cwd
+        return None
+
+    @property
+    def _worktree_info(self) -> tuple[str, str | None]:
+        cwd = self._cwd
+        if cwd:
+            return _worktree_info_from_cwd(cwd)
+        return ("unknown", None)
+
+    @property
+    def is_worktree(self) -> bool:
+        return self._worktree_info[1] is not None
+
+    @property
+    def worktree_name(self) -> str | None:
+        return self._worktree_info[1]
+
+    @property
     def project_name(self) -> str:
+        # For worktree sessions, always derive from cwd to get the real project name
+        proj, wt = self._worktree_info
+        if wt is not None:
+            return proj
+        # For non-worktree sessions, prefer the hook-stored project name
         if self.hook_state and self.hook_state.project_name:
             return self.hook_state.project_name
-        cwd = None
-        if self.hook_state:
-            cwd = self.hook_state.cwd
-        elif self.process_info:
-            cwd = self.process_info.cwd
-        if cwd:
-            return cwd.rstrip("/").rsplit("/", 1)[-1]
-        return "unknown"
+        return proj

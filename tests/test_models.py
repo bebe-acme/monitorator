@@ -212,6 +212,21 @@ class TestMergedSession:
         )
         assert merged.project_name == "fallback-proj"
 
+    def test_project_name_from_worktree_cwd_fallback(self) -> None:
+        proc = ProcessInfo(
+            pid=400, cpu_percent=0.0, elapsed_seconds=10,
+            cwd="/Users/nico/dev/myapp/.claude/worktrees/BOLD-OAK-A3F2",
+            command="claude",
+        )
+        merged = MergedSession(
+            session_id="fb-wt",
+            hook_state=None,
+            process_info=proc,
+            effective_status=SessionStatus.UNKNOWN,
+            is_stale=False,
+        )
+        assert merged.project_name == "myapp"
+
     def test_project_name_unknown_when_no_data(self) -> None:
         merged = MergedSession(
             session_id="none-1",
@@ -221,6 +236,80 @@ class TestMergedSession:
             is_stale=True,
         )
         assert merged.project_name == "unknown"
+
+
+class TestSessionStateWorktreeFields:
+    def test_defaults(self) -> None:
+        state = SessionState(session_id="wt-1", cwd="/tmp")
+        assert state.is_worktree is False
+        assert state.worktree_name is None
+
+    def test_worktree_roundtrip(self) -> None:
+        state = SessionState(
+            session_id="wt-2",
+            cwd="/Users/nico/dev/proj/.claude/worktrees/FOO-BAR-BAZ",
+            project_name="proj",
+            is_worktree=True,
+            worktree_name="FOO-BAR-BAZ",
+        )
+        d = state.to_dict()
+        assert d["is_worktree"] is True
+        assert d["worktree_name"] == "FOO-BAR-BAZ"
+
+        restored = SessionState.from_dict(d)
+        assert restored.is_worktree is True
+        assert restored.worktree_name == "FOO-BAR-BAZ"
+        assert restored.project_name == "proj"
+
+    def test_from_dict_missing_worktree_fields(self) -> None:
+        d = {"session_id": "wt-3", "cwd": "/tmp"}
+        state = SessionState.from_dict(d)
+        assert state.is_worktree is False
+        assert state.worktree_name is None
+
+
+class TestMergedSessionWorktreeProperties:
+    def test_worktree_session(self) -> None:
+        state = SessionState(
+            session_id="mwt-1",
+            cwd="/dev/proj/.claude/worktrees/ABC",
+            project_name="proj",
+            is_worktree=True,
+            worktree_name="ABC",
+        )
+        merged = MergedSession(
+            session_id="mwt-1",
+            hook_state=state,
+            process_info=None,
+            effective_status=SessionStatus.IDLE,
+            is_stale=False,
+        )
+        assert merged.is_worktree is True
+        assert merged.worktree_name == "ABC"
+        assert merged.project_name == "proj"
+
+    def test_non_worktree_session(self) -> None:
+        state = SessionState(session_id="mwt-2", cwd="/dev/proj", project_name="proj")
+        merged = MergedSession(
+            session_id="mwt-2",
+            hook_state=state,
+            process_info=None,
+            effective_status=SessionStatus.IDLE,
+            is_stale=False,
+        )
+        assert merged.is_worktree is False
+        assert merged.worktree_name is None
+
+    def test_no_hook_state(self) -> None:
+        merged = MergedSession(
+            session_id="mwt-3",
+            hook_state=None,
+            process_info=None,
+            effective_status=SessionStatus.UNKNOWN,
+            is_stale=True,
+        )
+        assert merged.is_worktree is False
+        assert merged.worktree_name is None
 
 
 class TestMergedSessionLastInteractionTime:

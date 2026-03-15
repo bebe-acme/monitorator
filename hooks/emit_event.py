@@ -58,8 +58,26 @@ def summarize_tool_input(tool_input: object) -> str:
     return truncate(", ".join(parts))
 
 
-def project_name_from_cwd(cwd: str) -> str:
-    return cwd.rstrip("/").rsplit("/", 1)[-1] if cwd else "unknown"
+def detect_worktree_info(cwd: str) -> tuple[str, str | None]:
+    """Detect if cwd is inside a worktree directory.
+
+    Checks for:
+    - /.claude/worktrees/<name>  (built-in Claude Code worktrees)
+    - /.worktrees/<name>         (Superpowers plugin / user convention)
+
+    Returns (project_name, worktree_name) where worktree_name is None if not a worktree.
+    """
+    if not cwd:
+        return ("unknown", None)
+    cleaned = cwd.rstrip("/")
+    for marker in ("/.claude/worktrees/", "/.worktrees/"):
+        idx = cleaned.find(marker)
+        if idx != -1:
+            project = cleaned[:idx].rsplit("/", 1)[-1] or "unknown"
+            worktree = cleaned[idx + len(marker):].split("/", 1)[0]
+            return (project, worktree if worktree else None)
+    return (cleaned.rsplit("/", 1)[-1] or "unknown", None)
+
 
 
 def detect_git_branch(cwd: str) -> str | None:
@@ -118,10 +136,13 @@ def main() -> None:
 
     existing = read_existing(sessions_dir, session_id)
 
+    effective_cwd_val = cwd or str(existing.get("cwd", ""))
+    wt_project, wt_name = detect_worktree_info(effective_cwd_val)
+
     state: dict[str, object] = {
         "session_id": session_id,
-        "cwd": cwd or existing.get("cwd", ""),
-        "project_name": existing.get("project_name") or project_name_from_cwd(cwd),
+        "cwd": effective_cwd_val,
+        "project_name": wt_project,
         "status": existing.get("status", "unknown"),
         "last_event": event_type,
         "timestamp": existing.get("timestamp", now),
@@ -132,19 +153,19 @@ def main() -> None:
         "last_prompt_summary": existing.get("last_prompt_summary"),
         "subagent_count": int(existing.get("subagent_count", 0)),
         "permission_mode": existing.get("permission_mode"),
+        "is_worktree": wt_name is not None,
+        "worktree_name": wt_name,
     }
 
     # Detect git branch on every event
-    effective_cwd = str(state.get("cwd", ""))
-    if effective_cwd:
-        branch = detect_git_branch(effective_cwd)
+    if effective_cwd_val:
+        branch = detect_git_branch(effective_cwd_val)
         if branch:
             state["git_branch"] = branch
 
     if event_type == "SessionStart":
         state["status"] = "idle"
         state["timestamp"] = now
-        state["project_name"] = project_name_from_cwd(cwd)
 
     elif event_type == "UserPromptSubmit":
         state["status"] = "thinking"
