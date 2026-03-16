@@ -10,13 +10,15 @@ from monitorator.merger import SessionMerger
 from monitorator.models import SessionStatus
 from monitorator.scanner import ProcessScanner
 from monitorator.state_store import StateStore
+from monitorator.tui.theme_colors import THEMES
 
 SESSIONS_DIR = Path.home() / ".monitorator" / "sessions"
 
 
 def cmd_run(args: argparse.Namespace) -> None:
     from monitorator.tui.app import MonitoratorApp
-    app = MonitoratorApp()
+    theme = getattr(args, "theme", None)
+    app = MonitoratorApp(theme_name=theme)
     app.run()
 
 
@@ -89,7 +91,18 @@ def main(argv: list[str] | None = None) -> None:
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser("run", help="Launch TUI dashboard")
+    run_parser = subparsers.add_parser("run", help="Launch TUI dashboard")
+    run_parser.add_argument(
+        "--theme", choices=list(THEMES.keys()), default=None,
+        help="Color theme (overrides saved preference)",
+    )
+
+    # Also add --theme to the top-level parser for `monitorator --theme bokeh`
+    parser.add_argument(
+        "--theme", choices=list(THEMES.keys()), default=None,
+        help="Color theme (overrides saved preference)",
+    )
+
     subparsers.add_parser("install", help="Install global hooks")
 
     uninstall_parser = subparsers.add_parser("uninstall", help="Remove hooks")

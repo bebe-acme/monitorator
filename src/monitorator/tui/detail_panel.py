@@ -8,7 +8,8 @@ from monitorator.context_size import get_context_estimate
 from monitorator.models import MergedSession
 from monitorator.project_metadata import get_project_description
 from monitorator.session_prompt import get_session_prompt
-from monitorator.tui.formatting import STATUS_ICONS, STATUS_COLORS, format_elapsed, format_memory
+from monitorator.tui.formatting import STATUS_ICONS, format_elapsed, format_memory
+from monitorator.tui.theme_colors import colors, get_status_color
 
 
 def _shorten_path(path: str, max_length: int = 55) -> str:
@@ -52,31 +53,31 @@ def _box_top(project: str) -> str:
     remaining = _BOX_WIDTH - len(prefix) - len(label) - 1  # -1 for closing ╗
     if remaining < 1:
         remaining = 1
-    return f"[#333300]{prefix}[/][bold #ffcc00]{label}[/][#333300]{_H * remaining}{_TR}[/]"
+    return f"[{colors.border_dim}]{prefix}[/][bold {colors.accent}]{label}[/][{colors.border_dim}]{_H * remaining}{_TR}[/]"
 
 
 def _box_bottom() -> str:
     """Build the bottom border."""
     inner = _H * (_BOX_WIDTH - 2)
-    return f"[#333300]{_BL}{inner}{_BR}[/]"
+    return f"[{colors.border_dim}]{_BL}{inner}{_BR}[/]"
 
 
 def _box_row(content: str) -> str:
     """Wrap content in box side borders."""
-    return f"[#333300]{_V}[/]  {content}"
+    return f"[{colors.border_dim}]{_V}[/]  {content}"
 
 
 class DetailPanel(Static):
     """Detail view for the selected session — hacker terminal aesthetic."""
 
     def __init__(self) -> None:
-        super().__init__("[#555555]select a session to inspect[/]")
+        super().__init__(f"[{colors.text_dim}]select a session to inspect[/]")
 
     def show_session(self, session: MergedSession) -> None:
         s = session
         status = s.effective_status
         icon = STATUS_ICONS.get(status, "?")
-        color = STATUS_COLORS.get(status, "#666666")
+        color = get_status_color(status)
 
         project = s.project_name
         pid = str(s.process_info.pid) if s.process_info else "-"
@@ -110,57 +111,57 @@ class DetailPanel(Static):
         _active = {SS.THINKING, SS.EXECUTING, SS.SUBAGENT_RUNNING}
         status_label = status.value.upper().replace("_", " ")
         if status == SS.WAITING_PERMISSION:
-            status_markup = f"[bold #ff3333 blink]{icon} {status_label} \u26a0\u26a0\u26a0[/]"
+            status_markup = f"[bold {colors.status_permission} blink]{icon} {status_label} \u26a0\u26a0\u26a0[/]"
         elif status in _active:
             status_markup = f"[{color} blink]{icon}[/] [{color}]{status_label}[/]"
         else:
             status_markup = f"[{color}]{icon} {status_label}[/]"
         row1 = (
             f"{status_markup}"
-            f"          "
-            f"[#555555]PID [/][#cccccc]{pid}[/]"
-            f"       "
-            f"[#555555]CPU [/][#cccccc]{cpu}[/]"
-            f"       "
-            f"[#555555]RAM [/][#cccccc]{ram}[/]"
-            f"       "
-            f"[#555555]\u23f1 [/][#cccccc]{elapsed}[/]"
-            f"       "
-            f"[#555555]ctx [/][#888888]{ctx}[/]"
+            f"    "
+            f"[{colors.text_dim}]PID [/][{colors.text_body}]{pid}[/]"
+            f"   "
+            f"[{colors.text_dim}]CPU [/][{colors.text_body}]{cpu}[/]"
+            f"   "
+            f"[{colors.text_dim}]RAM [/][{colors.text_body}]{ram}[/]"
+            f"   "
+            f"[{colors.text_dim}]\u23f1 [/][{colors.text_body}]{elapsed}[/]"
+            f"   "
+            f"[{colors.text_dim}]ctx [/][{colors.text_muted}]{ctx}[/]"
         )
 
         # Row 2: branch + cwd
         row2 = (
-            f"[#555555]branch [/][#3399ff]{branch}[/]"
-            f"         "
-            f"[#555555]cwd [/][#cccccc]{cwd}[/]"
+            f"[{colors.text_dim}]branch [/][{colors.branch_color}]{branch}[/]"
+            f"   "
+            f"[{colors.text_dim}]cwd [/][{colors.text_body}]{cwd}[/]"
         )
 
         # Row 2b: project description (if available from filesystem)
         desc_text = get_project_description(cwd_raw) if cwd_raw and cwd_raw != "-" else None
-        row_desc = f"[#555555]desc   [/][#ffcc00]{desc_text}[/]" if desc_text else ""
+        row_desc = f"[{colors.text_dim}]desc   [/][{colors.accent}]{desc_text}[/]" if desc_text else ""
 
         # Row 3: tool (only if active)
         row3 = ""
         if last_tool:
-            row3 = f"[#555555]tool   [/][{color}]{last_tool[:65]}[/]"
+            row3 = f"[{colors.text_dim}]tool   [/][{color}]{last_tool[:65]}[/]"
 
         # Row 4: prompt (only if available)
         row4 = ""
         if prompt:
             truncated = prompt[:60]
-            row4 = f'[#555555]prompt [/][italic #cccccc]{truncated}[/]'
+            row4 = f'[{colors.text_dim}]prompt [/][italic {colors.text_body}]{truncated}[/]'
         elif not s.hook_state and s.process_info and s.process_info.session_uuid:
             session_prompt = get_session_prompt(
                 s.process_info.cwd, s.process_info.session_uuid
             )
             if session_prompt:
-                row4 = f'[#555555]prompt [/][italic #cccccc]{session_prompt[:60]}[/]'
+                row4 = f'[{colors.text_dim}]prompt [/][italic {colors.text_body}]{session_prompt[:60]}[/]'
 
         # Row 5: subagents (only if > 0)
         row5 = ""
         if subagents > 0:
-            row5 = f"[#555555]subagents [/][#cc66ff]{subagents}[/]"
+            row5 = f"[{colors.text_dim}]subagents [/][{colors.status_subagent}]{subagents}[/]"
 
         # Assemble the box
         lines = [
@@ -181,4 +182,4 @@ class DetailPanel(Static):
         self.update("\n".join(lines))
 
     def clear_session(self) -> None:
-        self.update("[#555555]select a session to inspect[/]")
+        self.update(f"[{colors.text_dim}]select a session to inspect[/]")

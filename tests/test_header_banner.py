@@ -142,7 +142,9 @@ class TestHeaderBanner:
         banner = HeaderBanner()
         sessions = [make_merged("s1", SessionStatus.IDLE)]
         banner.update_counts(sessions)
-        assert "#666666" in banner._stats_text
+        # Idle count uses text_dimmer color from the active theme
+        from monitorator.tui.theme_colors import colors
+        assert colors.text_dimmer in banner._stats_text
 
     def test_no_render_content_override(self) -> None:
         """CRITICAL: HeaderBanner must NOT define _render_content."""

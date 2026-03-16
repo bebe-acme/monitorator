@@ -6,6 +6,7 @@ from textual.widgets import Static
 from monitorator.context_size import _format_tokens
 from monitorator.models import MergedSession, SessionStatus
 from monitorator.tui.sprites import SPRITE_TEMPLATES, render_sprite
+from monitorator.tui.theme_colors import colors
 
 _ACTIVE_STATUSES = {
     SessionStatus.THINKING,
@@ -13,9 +14,12 @@ _ACTIVE_STATUSES = {
     SessionStatus.SUBAGENT_RUNNING,
 }
 
-# ── Ghost sprite (yellow palette for header logo) ──
+# ── Ghost sprite (palette adapts to theme) ──
 _GHOST_GRID = SPRITE_TEMPLATES[1]
-_GHOST_PALETTE = {2: "#ffcc00", 3: "#ffffff", 4: "#0a0a0a"}
+
+
+def _ghost_palette() -> dict[int, str]:
+    return {2: colors.accent, 3: colors.text_bright, 4: colors.bg_base}
 
 # Pupil row variants for eye animation (row index 4 of the ghost grid).
 # Each eye is 2px wide (cols 3-4 and 7-8). Pupil (value 4) shifts left↔right.
@@ -76,14 +80,14 @@ class HeaderBanner(Static):
         """Rebuild the Rich markup and push it into the Static widget."""
         grid = list(_GHOST_GRID)
         grid[4] = _EYE_FRAMES[self._eye_frame]
-        ghost = render_sprite(grid, _GHOST_PALETTE)
+        ghost = render_sprite(grid, _ghost_palette())
 
         if self._stats_text:
             stats_line = self._stats_text
         else:
-            stats_line = "[#666666]waiting for sessions\u2026[/]"
+            stats_line = f"[{colors.text_dimmer}]waiting for sessions\u2026[/]"
 
-        title = "[bold #ffcc00]MONITORATOR[/]"
+        title = f"[bold {colors.accent}]MONITORATOR[/]"
 
         line1 = f"{ghost[0]}"
         line2 = f"{ghost[1]}"
@@ -103,37 +107,39 @@ class HeaderBanner(Static):
         sort_mode: str = "time",
         filter_mode: str = "all",
         tokens_used: int = 0,
+        theme_name: str = "dark",
     ) -> None:
         """Recompute stats from live session list and re-render."""
         counts = count_sessions(sessions)
 
         parts: list[str] = []
         parts.append(
-            f"[bold #ffcc00]\u25c6 {counts['total']}[/] [#999999]sessions[/]"
+            f"[bold {colors.accent}]\u25c6 {counts['total']}[/] [{colors.text_muted}]sessions[/]"
         )
         if counts["active"]:
             parts.append(
-                f"[bold #00ff66]\u25cf {counts['active']}[/] [#999999]active[/]"
+                f"[bold {colors.status_thinking}]\u25cf {counts['active']}[/] [{colors.text_muted}]active[/]"
             )
         if counts["idle"]:
             parts.append(
-                f"[#666666]\u25cb {counts['idle']} idle[/]"
+                f"[{colors.text_dimmer}]\u25cb {counts['idle']} idle[/]"
             )
         if counts["waiting"]:
             parts.append(
-                f"[bold #ff3333]\u26a0 {counts['waiting']}[/]"
+                f"[bold {colors.status_permission}]\u26a0 {counts['waiting']}[/]"
             )
 
         # Token usage since TUI start
         parts.append(
-            f"[#cc66ff]\u2261 {_format_tokens(tokens_used)} tokens[/]"
+            f"[{colors.status_subagent}]\u2261 {_format_tokens(tokens_used)} tokens[/]"
         )
 
-        # Sort/filter indicators (only show non-defaults)
+        # Sort/filter/theme indicators (only show non-defaults)
         if sort_mode != "time":
-            parts.append(f"[#888888]\u2195 {sort_mode}[/]")
+            parts.append(f"[{colors.text_muted}]\u2195 {sort_mode}[/]")
         if filter_mode != "all":
-            parts.append(f"[#cc8800]\u25b6 {filter_mode}[/]")
+            parts.append(f"[{colors.status_idle}]\u25b6 {filter_mode}[/]")
+        parts.append(f"[{colors.text_muted}]\u25d0 {theme_name}[/]")
 
         self._stats_text = "  ".join(parts)
         self._do_render()

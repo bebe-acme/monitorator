@@ -21,6 +21,7 @@ from monitorator.tui.formatting import (
     format_memory,
 )
 from monitorator.tui.sprites import get_sprite_color, get_sprite_frame, sprite_index_for_session
+from monitorator.tui.theme_colors import colors, get_status_color
 
 # Matches text that starts with an XML-style tag (system/internal messages)
 _XML_TAG_RE = re.compile(r"^\s*<[a-zA-Z][\w-]*[ >/]")
@@ -79,19 +80,13 @@ _STATUS_TO_BAR_CLASS: dict[SessionStatus, str] = {
     SessionStatus.IDLE: "status-idle",
 }
 
-# Bright status colors for human prompt line (line 2)
-_PROMPT_COLORS: dict[SessionStatus, str] = {
-    SessionStatus.THINKING: "#00ff66",
-    SessionStatus.EXECUTING: "#33aaff",
-    SessionStatus.SUBAGENT_RUNNING: "#cc66ff",
-    SessionStatus.WAITING_PERMISSION: "#ff3333",
-    SessionStatus.IDLE: "#cc8800",
-    SessionStatus.TERMINATED: "#444444",
-    SessionStatus.UNKNOWN: "#444444",
-}
+def _get_prompt_color(status: SessionStatus) -> str:
+    """Prompt line color — uses theme-aware status colors."""
+    return get_status_color(status)
 
-# Uniform grey for system activity line (line 3) — calm, non-distracting
-_ACTIVITY_COLOR = "#777777"
+
+def _get_activity_color() -> str:
+    return colors.activity_color
 
 
 def _get_term_width() -> int:
@@ -242,7 +237,7 @@ class SessionRow(Widget, can_focus=True):
                 if estimate:
                     ctx = estimate
 
-        color = STATUS_COLORS.get(status, "#666666")
+        color = get_status_color(status)
         proj_color = get_sprite_color(sprite_idx=self._sprite_idx)
 
         # Status badge (icon + label)
@@ -257,7 +252,7 @@ class SessionRow(Widget, can_focus=True):
         # Line 1: status badge + project pixel badge + branch + label
         proj_badge = (
             f"[{proj_color}]\u2590[/]"
-            f"[bold #0a0a0a on {proj_color}] {project} [/]"
+            f"[bold {colors.bg_base} on {proj_color}] {project} [/]"
             f"[{proj_color}]\u258c[/]"
         )
         line1_parts = f"{badge_markup}  {proj_badge}"
@@ -269,15 +264,15 @@ class SessionRow(Widget, can_focus=True):
             wt_name = s.worktree_name.lower()
             if len(wt_name) > 20:
                 wt_name = wt_name[:19] + "\u2026"
-            line1_parts += f"  [dim #8a8a8a]\U0001f33f {wt_name}[/]"
+            line1_parts += f"  [dim {colors.text_muted}]\U0001f33f {wt_name}[/]"
         if show_branch:
-            line1_parts += f"  [#3399ff]{branch:<10s}[/]"
+            line1_parts += f"  [{colors.branch_color}]{branch:<10s}[/]"
 
         # User label — capped, appended on the right of line 1
         user_label = get_label(s.session_id)
         if user_label:
             capped = (user_label[:_LABEL_MAX - 1] + "\u2026") if len(user_label) > _LABEL_MAX else user_label
-            line1_parts += f"  [#aaaaff]{capped}[/]"
+            line1_parts += f"  [{colors.info_color}]{capped}[/]"
 
         # Dim terminated rows
         if status == SessionStatus.TERMINATED:
@@ -296,10 +291,10 @@ class SessionRow(Widget, can_focus=True):
 
         if prompt_text:
             truncated = (prompt_text[:desc_max - 1] + "\u2026") if len(prompt_text) > desc_max else prompt_text
-            text_color = _PROMPT_COLORS.get(status, "#555555")
-            line2 = f"    [#555555]\u2514\u2500[/] [italic {text_color}]{truncated}[/]"
+            text_color = _get_prompt_color(status)
+            line2 = f"    [{colors.text_dim}]\u2514\u2500[/] [italic {text_color}]{truncated}[/]"
         else:
-            line2 = "[#0a0a0a].[/]"
+            line2 = f"[{colors.bg_base}].[/]"
 
         # Line 3: latest activity / agent response
         activity_text: str | None = None
@@ -308,19 +303,19 @@ class SessionRow(Widget, can_focus=True):
             activity_text = (activity_raw[:desc_max - 1] + "\u2026") if len(activity_raw) > desc_max else activity_raw
 
         if activity_text:
-            line3 = f"    [#555555]\u2514\u2500[/] [{_ACTIVITY_COLOR}]{activity_text}[/]"
+            line3 = f"    [{colors.text_dim}]\u2514\u2500[/] [{_get_activity_color()}]{activity_text}[/]"
         else:
-            line3 = "[#0a0a0a].[/]"
+            line3 = f"[{colors.bg_base}].[/]"
 
         # Line 4: cpu/elapsed/ctx  (or NEEDS HUMAN INTERVENTION)
         if status == SessionStatus.WAITING_PERMISSION:
-            line4 = f"    [bold #ff3333 blink]\u26a0 NEEDS HUMAN INTERVENTION[/]"
+            line4 = f"    [bold {colors.status_permission} blink]\u26a0 NEEDS HUMAN INTERVENTION[/]"
         else:
-            line4 = f"    [#555555]{cpu:>5s}[/]  [#555555]{ram:>6s}[/]  [#444444]{elapsed}[/]"
+            line4 = f"    [{colors.text_dim}]{cpu:>5s}[/]  [{colors.text_dim}]{ram:>6s}[/]  [{colors.text_dimmer}]{elapsed}[/]"
             if show_ctx:
-                line4 += f"  [#888888]{ctx:>6s}[/]"
+                line4 += f"  [{colors.text_muted}]{ctx:>6s}[/]"
 
-        line5 = "[#0a0a0a].[/]"
+        line5 = f"[{colors.bg_base}].[/]"
 
         return f"{line1}\n{line2}\n{line3}\n{line4}\n{line5}"
 

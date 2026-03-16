@@ -5,35 +5,42 @@ from textual.widgets import Static
 from textual.containers import Vertical
 from textual.binding import Binding
 
+from monitorator.tui.theme_colors import colors
+
 
 class HelpScreen(ModalScreen[None]):
     """Modal help overlay showing keybindings."""
 
     BINDINGS = [
         Binding("question_mark", "dismiss", "Close", show=False),
+        Binding("h", "dismiss", "Close", show=False),
         Binding("escape", "dismiss", "Close"),
     ]
 
     def compose(self):
+        a = colors.accent
+        d = colors.text_dimmer
         help_text = (
-            "[bold #ffcc00]MONITORATOR \u2014 Keyboard Shortcuts[/]\n"
+            f"[bold {a}]MONITORATOR \u2014 Keyboard Shortcuts[/]\n"
             "\n"
-            "[#ffcc00]q[/]       Quit\n"
-            "[#ffcc00]r[/]       Refresh\n"
-            "[#ffcc00]R[/]       Force Refresh (aggressive cleanup)\n"
-            "[#ffcc00]o[/]       Open Terminal for session\n"
-            "[#ffcc00]j/k[/]     Navigate up/down\n"
-            "[#ffcc00]Enter[/]   Select session (show details)\n"
-            "[#ffcc00]s[/]       Cycle sort mode\n"
-            "[#ffcc00]f[/]       Cycle filter mode\n"
-            "[#ffcc00]v[/]       Toggle compact view\n"
-            "[#ffcc00]c[/]       Copy CWD to clipboard\n"
-            "[#ffcc00]l[/]       Set session label\n"
-            "[#ffcc00]x[/]       Kill focused session\n"
-            "[#ffcc00]X[/]       Kill all stale sessions\n"
-            "[#ffcc00]?[/]       This help screen\n"
+            f"[{a}]q[/]       Quit\n"
+            f"[{a}]r[/]       Refresh\n"
+            f"[{a}]R[/]       Force Refresh (aggressive cleanup)\n"
+            f"[{a}]o[/]       Open Terminal for session\n"
+            f"[{a}]t[/]       Cycle theme (dark/light/boke)\n"
+            f"[{a}]T[/]       Theme picker\n"
+            f"[{a}]j/k[/]     Navigate up/down\n"
+            f"[{a}]Enter[/]   Select session (show details)\n"
+            f"[{a}]s[/]       Cycle sort mode\n"
+            f"[{a}]f[/]       Cycle filter mode\n"
+            f"[{a}]v[/]       Toggle compact view\n"
+            f"[{a}]c[/]       Copy CWD to clipboard\n"
+            f"[{a}]l[/]       Set session label\n"
+            f"[{a}]x[/]       Kill focused session\n"
+            f"[{a}]X[/]       Kill all stale sessions\n"
+            f"[{a}]?/h[/]     This help screen\n"
             "\n"
-            "[#666666]Press ? or Esc to close[/]"
+            f"[{d}]Press ? or Esc to close[/]"
         )
         with Vertical(id="help-container"):
             yield Static(help_text, markup=True, id="help-text")
@@ -45,9 +52,9 @@ class HelpScreen(ModalScreen[None]):
     #help-container {
         width: 50;
         height: auto;
-        max-height: 20;
-        background: #111111;
-        border: double #ffcc00;
+        max-height: 22;
+        background: $bg-raised;
+        border: double $accent;
         padding: 1 2;
     }
     """

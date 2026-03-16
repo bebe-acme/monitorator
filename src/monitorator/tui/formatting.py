@@ -4,6 +4,7 @@ import os
 import time
 
 from monitorator.models import MergedSession, SessionStatus
+from monitorator.tui.theme_colors import get_status_color
 
 
 STATUS_ICONS: dict[SessionStatus, str] = {
@@ -16,15 +17,20 @@ STATUS_ICONS: dict[SessionStatus, str] = {
     SessionStatus.UNKNOWN: "?",
 }
 
-STATUS_COLORS: dict[SessionStatus, str] = {
-    SessionStatus.THINKING: "#00ff66",
-    SessionStatus.EXECUTING: "#3399ff",
-    SessionStatus.WAITING_PERMISSION: "#ff3333",
-    SessionStatus.IDLE: "#ffaa00",
-    SessionStatus.SUBAGENT_RUNNING: "#cc66ff",
-    SessionStatus.TERMINATED: "#444444",
-    SessionStatus.UNKNOWN: "#444444",
-}
+class _StatusColorMap:
+    """Dict-like mapping that reads from the active theme."""
+
+    def get(self, status: SessionStatus, default: str = "#666666") -> str:
+        return get_status_color(status)
+
+    def __getitem__(self, status: SessionStatus) -> str:
+        return get_status_color(status)
+
+    def __contains__(self, status: object) -> bool:
+        return isinstance(status, SessionStatus)
+
+
+STATUS_COLORS: _StatusColorMap = _StatusColorMap()
 
 STATUS_LABELS: dict[SessionStatus, str] = {
     SessionStatus.THINKING: "THINK",

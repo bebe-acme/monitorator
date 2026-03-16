@@ -9,6 +9,7 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.binding import Binding
+from textual.design import ColorSystem
 from textual.widgets import Footer
 
 from monitorator.models import MergedSession, SessionStatus
@@ -21,6 +22,7 @@ from monitorator.installer import HookInstaller
 from monitorator.notifier import Notifier
 from monitorator.tab_renamer import rename_tabs
 from monitorator.terminal_opener import open_terminal_for_pid
+from monitorator.preferences import get_theme_preference, set_theme_preference
 from monitorator.tui.header_banner import HeaderBanner, RefreshRequested
 from monitorator.tui.column_header import ColumnHeader
 from monitorator.tui.help_screen import HelpScreen
@@ -29,11 +31,76 @@ from monitorator.tui.sprites import assign_sprites
 from monitorator.tui.chat_dropdown import ChatDropdown
 from monitorator.tui.detail_panel import DetailPanel
 from monitorator.tui.label_screen import LabelScreen
+from monitorator.tui.theme_screen import ThemeScreen
+from monitorator.tui import theme_colors
+from monitorator.tui.theme_colors import THEMES, ThemeColors
 
 CSS_PATH = Path(__file__).parent / "styles.tcss"
 SESSIONS_DIR = Path.home() / ".monitorator" / "sessions"
 POLL_INTERVAL = 2.0
 ANIM_INTERVAL = 0.3  # sprite animation refresh (visual-only, no I/O)
+
+_THEME_CYCLE = list(THEMES.keys())  # dark, light, bokeh
+
+
+def _make_css_variables(tc: ThemeColors) -> dict[str, str]:
+    """Convert ThemeColors dataclass to CSS variable dict for Textual Theme."""
+    return {
+        "bg-base": tc.bg_base,
+        "bg-raised": tc.bg_raised,
+        "bg-panel": tc.bg_panel,
+        "bg-hover": tc.bg_hover,
+        "bg-focused": tc.bg_focused,
+        "bg-permission": tc.bg_permission,
+        "border-accent": tc.border_accent,
+        "border-dim": tc.border_dim,
+        "separator": tc.separator,
+        "text-body": tc.text_body,
+        "text-bright": tc.text_bright,
+        "text-muted": tc.text_muted,
+        "text-dim": tc.text_dim,
+        "text-dimmer": tc.text_dimmer,
+        "accent": tc.accent,
+        "accent-bg": tc.accent_bg,
+        "status-thinking": tc.status_thinking,
+        "status-executing": tc.status_executing,
+        "status-permission": tc.status_permission,
+        "status-idle": tc.status_idle,
+        "status-subagent": tc.status_subagent,
+        "status-terminated": tc.status_terminated,
+        "info-color": tc.info_color,
+        "branch-color": tc.branch_color,
+        "activity-color": tc.activity_color,
+        "chat-user": tc.chat_user,
+        "chat-assistant": tc.chat_assistant,
+        "scrollbar-idle": tc.scrollbar_idle,
+        "scrollbar-active": tc.scrollbar_active,
+    }
+
+
+def _build_textual_themes() -> dict[str, "Theme"]:
+    """Build Textual Theme instances for each monitorator theme."""
+    from textual.theme import Theme
+
+    result = {}
+    for name, tc in THEMES.items():
+        is_dark = name != "light"
+        result[f"monitorator-{name}"] = Theme(
+            name=f"monitorator-{name}",
+            primary=tc.accent,
+            secondary=tc.info_color,
+            warning=tc.status_idle,
+            error=tc.status_permission,
+            success=tc.status_thinking,
+            accent=tc.accent,
+            foreground=tc.text_body,
+            background=tc.bg_base,
+            surface=tc.bg_raised,
+            panel=tc.bg_panel,
+            dark=is_dark,
+            variables=_make_css_variables(tc),
+        )
+    return result
 
 _STALE_ACTIVE_STATUSES = {
     SessionStatus.THINKING,
@@ -53,12 +120,15 @@ class MonitoratorApp(App[None]):
         Binding("r", "refresh", "Refresh"),
         Binding("R", "force_refresh", "Force Refresh"),
         Binding("o", "open_terminal", "Open Terminal"),
+        Binding("t", "cycle_theme", "Theme"),
+        Binding("T", "pick_theme", "Theme Picker", show=False),
         Binding("up", "cursor_up", "Up", show=False, priority=True),
         Binding("down", "cursor_down", "Down", show=False, priority=True),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("enter", "select_session", "Select"),
         Binding("question_mark", "help", "Help"),
+        Binding("h", "help", "Help", show=False),
         Binding("s", "cycle_sort", "Sort", show=False),
         Binding("f", "cycle_filter", "Filter", show=False),
         Binding("v", "toggle_compact", "Compact", show=False),
@@ -72,8 +142,11 @@ class MonitoratorApp(App[None]):
     _SORT_MODES = ["time", "status", "project"]
     _FILTER_MODES = ["all", "active", "idle", "permission"]
 
-    def __init__(self, sessions_dir: Path | None = None) -> None:
+    def __init__(self, sessions_dir: Path | None = None, theme_name: str | None = None) -> None:
         super().__init__()
+        # Resolve theme: CLI flag > saved preference > default
+        self._theme_name = theme_name or get_theme_preference()
+        theme_colors.set_theme(self._theme_name)
         self._store = StateStore(sessions_dir or SESSIONS_DIR)
         self._scanner = ProcessScanner()
         self._merger = SessionMerger()
@@ -91,14 +164,23 @@ class MonitoratorApp(App[None]):
         # Maps (cwd, uuid) -> cumulative output_tokens for that session
         self._token_snapshots: dict[tuple[str, str], int] = {}
 
+    def get_theme_variable_defaults(self) -> dict[str, str]:
+        """Provide dark theme colors as defaults so CSS variables always resolve."""
+        return _make_css_variables(THEMES["dark"])
+
     def compose(self) -> ComposeResult:
         yield HeaderBanner()
         yield ColumnHeader()
         yield VerticalScroll(id="session-list")
-        yield DetailPanel()
         yield Footer()
+        yield DetailPanel()
 
     def on_mount(self) -> None:
+        # Register all monitorator themes
+        for textual_theme in _build_textual_themes().values():
+            self.register_theme(textual_theme)
+        self.theme = f"monitorator-{self._theme_name}"
+
         # Auto-update hooks if binary has changed (e.g. after git pull)
         installer = HookInstaller()
         if installer.ensure_up_to_date():
@@ -187,7 +269,7 @@ class MonitoratorApp(App[None]):
         sort_mode = self._SORT_MODES[self._sort_mode % len(self._SORT_MODES)]
         banner.update_counts(
             merged, sort_mode=sort_mode, filter_mode=filter_mode,
-            tokens_used=tokens_since_start,
+            tokens_used=tokens_since_start, theme_name=self._theme_name,
         )
         col_header = self.query_one(ColumnHeader)
         col_header.rebuild()
@@ -378,6 +460,27 @@ class MonitoratorApp(App[None]):
     def action_help(self) -> None:
         """Show help overlay with keybindings."""
         self.push_screen(HelpScreen())
+
+    def action_cycle_theme(self) -> None:
+        """Cycle through themes: dark → light → boke → dark."""
+        idx = _THEME_CYCLE.index(self._theme_name)
+        self._theme_name = _THEME_CYCLE[(idx + 1) % len(_THEME_CYCLE)]
+        theme_colors.set_theme(self._theme_name)
+        self.theme = f"monitorator-{self._theme_name}"
+        set_theme_preference(self._theme_name)
+        self._refresh()
+
+    def action_pick_theme(self) -> None:
+        """Show theme picker modal."""
+        def _on_theme_selected(result: str | None) -> None:
+            if result and result != self._theme_name:
+                self._theme_name = result
+                theme_colors.set_theme(self._theme_name)
+                self.theme = f"monitorator-{self._theme_name}"
+                set_theme_preference(self._theme_name)
+                self._refresh()
+
+        self.push_screen(ThemeScreen(self._theme_name), callback=_on_theme_selected)
 
     def action_cycle_sort(self) -> None:
         """Cycle through sort modes: time -> status -> project."""
