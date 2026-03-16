@@ -943,7 +943,8 @@ class TestSessionRowLabels:
         with patch("monitorator.tui.session_row.get_label", return_value="my label"):
             row = SessionRow(session)
             content = row._build_content()
-        assert "#aaaaff" in content  # label color
+        from monitorator.tui.theme_colors import colors
+        assert colors.info_color in content  # label color
 
     def test_label_capped_at_30_chars(self) -> None:
         from monitorator.tui.session_row import SessionRow

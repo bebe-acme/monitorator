@@ -3,6 +3,7 @@ from __future__ import annotations
 from textual.widgets import Static
 
 from monitorator.tui.session_row import get_layout_config
+from monitorator.tui.theme_colors import colors
 
 
 class ColumnHeader(Static, can_focus=False):
@@ -27,12 +28,12 @@ class ColumnHeader(Static, can_focus=False):
         if show_branch:
             parts += f"{'BRANCH':<12s}"
 
-        header = f"[#888888]{parts}[/]"
+        header = f"[{colors.text_muted}]{parts}[/]"
 
         # Separator line — match total width
         sep_w = 14 + 9 + proj_w + 2
         if show_branch:
             sep_w += 12
 
-        separator = f"[#888888]{'\u2500' * sep_w}[/]"
+        separator = f"[{colors.text_muted}]{'\u2500' * sep_w}[/]"
         return f"{header}\n{separator}"

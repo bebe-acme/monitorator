@@ -1,29 +1,16 @@
 /* ═══════════════════════════════════════════════════════════
-   MONITORATOR  -  DexScreener Table Theme (v2)
+   MONITORATOR  -  Theme-aware styles
    ───────────────────────────────────────────────────────────
-   Palette
-     bg-base:   #0a0a0a   (near-black)
-     bg-raised: #111111   (footer surface)
-     bg-panel:  #0e0e0e   (detail panel)
-     accent:    #ffcc00   (bright yellow)
-     accent-bg: #1a1a00   (dark amber tint)
-     amber-dim: #333300   (dark amber border / scrollbar idle)
-     separator: #1a1a1a   (row dividers)
-     text:      #cccccc   (default body)
-     text-hi:   #ffffff   (focused row text)
-     warn:      #ff3333   (red warnings)
-     info:      #3399ff   (blue informational)
-     hover:     #151515   (row hover surface)
-     green:     #00ff66   (active/thinking)
-     purple:    #cc66ff   (subagent)
+   All colors use CSS variables set by the active Theme
+   registered in app.py via Textual's Theme system.
    ═══════════════════════════════════════════════════════════ */
 
 
 /* ─── Screen ─── */
 
 Screen {
-    background: #0a0a0a;
-    color: #cccccc;
+    background: $bg-base;
+    color: $text-body;
 }
 
 
@@ -32,10 +19,10 @@ Screen {
 HeaderBanner {
     dock: top;
     height: 7;
-    background: #0a0a0a;
-    color: #ffcc00;
+    background: $bg-base;
+    color: $accent;
     padding: 0 1;
-    border: solid #333300;
+    border: solid $border-dim;
 }
 
 
@@ -44,10 +31,10 @@ HeaderBanner {
 ColumnHeader {
     dock: top;
     height: 2;
-    background: #0a0a0a;
-    color: #888888;
+    background: $bg-base;
+    color: $text-muted;
     padding: 0 1;
-    border-bottom: solid #1a1a1a;
+    border-bottom: solid $separator;
 }
 
 
@@ -56,14 +43,14 @@ ColumnHeader {
 #session-list {
     height: 1fr;
     min-height: 4;
-    background: #0a0a0a;
+    background: $bg-base;
     scrollbar-size: 1 1;
-    scrollbar-color: #333300;
-    scrollbar-color-hover: #ffcc00;
-    scrollbar-color-active: #ffcc00;
-    scrollbar-background: #0a0a0a;
-    scrollbar-background-hover: #111111;
-    scrollbar-background-active: #111111;
+    scrollbar-color: $scrollbar-idle;
+    scrollbar-color-hover: $scrollbar-active;
+    scrollbar-color-active: $scrollbar-active;
+    scrollbar-background: $bg-base;
+    scrollbar-background-hover: $bg-raised;
+    scrollbar-background-active: $bg-raised;
 }
 
 
@@ -73,11 +60,11 @@ SessionRow {
     layout: horizontal;
     height: auto;
     min-height: 5;
-    background: #0a0a0a;
-    color: #cccccc;
+    background: $bg-base;
+    color: $text-body;
     padding: 0 1;
     margin: 0;
-    border-bottom: solid #222222;
+    border-bottom: solid $separator;
     overflow: hidden;
 }
 
@@ -99,63 +86,63 @@ SessionText {
 }
 
 SessionRow:hover {
-    background: #151515;
+    background: $bg-hover;
 }
 
 SessionRow:focus {
-    background: #1a1a00;
-    color: #ffffff;
+    background: $bg-focused;
+    color: $text-bright;
 }
 
 SessionRow.status-active:focus {
-    border-left: thick #00ff66;
+    border-left: thick $status-thinking;
 }
 
 SessionRow.status-active.bar-off:focus {
-    border-left: thick #1a1a00;
+    border-left: thick $bg-focused;
 }
 
 SessionRow.status-permission:focus {
-    border-left: thick #ff3333;
+    border-left: thick $status-permission;
 }
 
 SessionRow.status-permission.bar-off:focus {
-    border-left: thick #1a0505;
+    border-left: thick $bg-permission;
 }
 
 SessionRow.status-idle:focus {
-    border-left: thick #ffcc00;
+    border-left: thick $accent;
 }
 
 /* ─── Status bar (left border indicator) ─── */
 
 SessionRow.status-active {
-    border-left: thick #00ff66;
+    border-left: thick $status-thinking;
 }
 
 SessionRow.status-active.bar-off {
-    border-left: thick #0a0a0a;
+    border-left: thick $bg-base;
 }
 
 SessionRow.status-permission {
-    background: #1a0505;
-    border-left: thick #ff3333;
+    background: $bg-permission;
+    border-left: thick $status-permission;
 }
 
 SessionRow.status-permission.bar-off {
-    border-left: thick #0a0a0a;
+    border-left: thick $bg-base;
 }
 
 SessionRow.status-idle {
-    border-left: thick #1a1a1a;
+    border-left: thick $separator;
 }
 
 SessionRow.needs-input {
-    background: #1a0505;
+    background: $bg-permission;
 }
 
 SessionRow.needs-input:focus {
-    background: #1a0505;
+    background: $bg-permission;
 }
 
 
@@ -166,28 +153,28 @@ DetailPanel {
     height: auto;
     min-height: 5;
     max-height: 10;
-    background: #0e0e0e;
-    color: #cccccc;
-    border-top: double #ffcc00;
+    background: $bg-panel;
+    color: $text-body;
+    border-top: double $accent;
     padding: 0 1;
 }
 
 DetailPanel .detail-label {
-    color: #ffcc00;
+    color: $accent;
     text-style: bold;
 }
 
 DetailPanel .detail-value {
-    color: #cccccc;
+    color: $text-body;
 }
 
 DetailPanel .detail-warn {
-    color: #ff3333;
+    color: $status-permission;
     text-style: bold;
 }
 
 DetailPanel .detail-info {
-    color: #3399ff;
+    color: $info-color;
 }
 
 
@@ -196,18 +183,18 @@ DetailPanel .detail-info {
 ChatDropdown {
     height: auto;
     max-height: 16;
-    background: #0e0e0e;
-    border: round #333300;
-    border-left: wide #ffcc00;
+    background: $bg-panel;
+    border: round $border-dim;
+    border-left: wide $accent;
     padding: 1 2;
     margin: 0 1 1 3;
     scrollbar-size: 1 1;
-    scrollbar-color: #333300;
-    scrollbar-color-hover: #ffcc00;
-    scrollbar-color-active: #ffcc00;
-    scrollbar-background: #0e0e0e;
-    scrollbar-background-hover: #111111;
-    scrollbar-background-active: #111111;
+    scrollbar-color: $scrollbar-idle;
+    scrollbar-color-hover: $scrollbar-active;
+    scrollbar-color-active: $scrollbar-active;
+    scrollbar-background: $bg-panel;
+    scrollbar-background-hover: $bg-raised;
+    scrollbar-background-active: $bg-raised;
 }
 
 ChatMessage {
@@ -221,7 +208,7 @@ ChatMessage.user-msg {
 }
 
 ChatMessage.turn-start {
-    border-top: solid #1a1a1a;
+    border-top: solid $separator;
 }
 
 ChatMessage.assistant-msg {
@@ -236,28 +223,28 @@ ChatMessage.tool-msg {
 /* ─── Footer ─── */
 
 Footer {
-    background: #111111;
-    color: #666666;
-    border-top: solid #1a1a1a;
+    background: $bg-raised;
+    color: $text-dimmer;
+    border-top: solid $separator;
     padding: 0 2;
 }
 
 Footer > .footer--highlight {
-    background: #1a1a00;
-    color: #ffcc00;
+    background: $accent-bg;
+    color: $accent;
     margin: 0 1;
 }
 
 Footer > .footer--key {
-    background: #1a1a00;
-    color: #ffcc00;
+    background: $accent-bg;
+    color: $accent;
     text-style: bold;
     margin: 0 1;
 }
 
 Footer > .footer--highlight-key {
-    background: #ffcc00;
-    color: #000000;
+    background: $accent;
+    color: $bg-base;
     text-style: bold;
     margin: 0 1;
 }
@@ -273,8 +260,8 @@ LabelScreen {
     width: 60;
     height: auto;
     max-height: 9;
-    background: #1a1a1a;
-    border: round #ffcc00;
+    background: $separator;
+    border: round $accent;
     padding: 1 2;
 }
 
@@ -283,12 +270,12 @@ LabelScreen {
 }
 
 #label-dialog Input {
-    background: #0a0a0a;
-    border: solid #333300;
-    color: #cccccc;
+    background: $bg-base;
+    border: solid $border-dim;
+    color: $text-body;
     margin: 0 0 1 0;
 }
 
 #label-dialog Input:focus {
-    border: solid #ffcc00;
+    border: solid $accent;
 }

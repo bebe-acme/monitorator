@@ -6,6 +6,7 @@ from textual.widgets import Input, Static
 from textual.containers import Vertical
 
 from monitorator.labels import set_label
+from monitorator.tui.theme_colors import colors
 
 
 class LabelScreen(ModalScreen[str | None]):
@@ -20,7 +21,7 @@ class LabelScreen(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="label-dialog"):
-            yield Static("[bold #ffcc00]Set session label[/]", markup=True)
+            yield Static(f"[bold {colors.accent}]Set session label[/]", markup=True)
             yield Input(
                 value=self._current_label,
                 placeholder="e.g. login feature expansion",

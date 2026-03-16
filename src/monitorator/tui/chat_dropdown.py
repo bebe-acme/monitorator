@@ -8,6 +8,7 @@ from textual.widgets import Static
 
 from monitorator.models import MergedSession
 from monitorator.session_prompt import find_newest_jsonl_for_cwd, get_session_history
+from monitorator.tui.theme_colors import colors
 
 
 class ChatMessage(Static):
@@ -52,7 +53,7 @@ class ChatDropdown(VerticalScroll):
     def compose(self) -> ComposeResult:
         if not self._messages:
             yield ChatMessage(
-                "  [dim #555555]No conversation history available[/]",
+                f"  [dim {colors.text_dim}]No conversation history available[/]",
                 markup=True,
             )
             return
@@ -66,18 +67,18 @@ class ChatDropdown(VerticalScroll):
                 safe_oneline = safe.replace("\n", " ").strip()
                 if len(safe_oneline) > 80:
                     safe_oneline = safe_oneline[:79] + "\u2026"
-                content = f"  [bold #6366f1]you:[/] [#eeeeee]{safe_oneline}[/]"
+                content = f"  [bold {colors.chat_user}]you:[/] [{colors.text_bright}]{safe_oneline}[/]"
                 yield ChatMessage(content, markup=True, classes=cls)
 
             elif role == "assistant":
                 safe_oneline = safe.replace("\n", " ").strip()
                 if len(safe_oneline) > 80:
                     safe_oneline = safe_oneline[:79] + "\u2026"
-                content = f"  [bold #ffcc00]claude:[/] [#bbbbbb]{safe_oneline}[/]"
+                content = f"  [bold {colors.chat_assistant}]claude:[/] [{colors.text_body}]{safe_oneline}[/]"
                 yield ChatMessage(content, markup=True, classes="assistant-msg")
 
             elif role == "tool":
-                content = f"    [#555555]● {safe}[/]"
+                content = f"    [{colors.text_dim}]● {safe}[/]"
                 yield ChatMessage(content, markup=True, classes="tool-msg")
 
             prev_role = role
