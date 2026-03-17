@@ -7,6 +7,9 @@ from monitorator.tui.theme_colors import (
     DARK,
     LIGHT,
     BOKEH,
+    HIGH_CONTRAST,
+    SOLARIZED_DARK,
+    SOLARIZED_LIGHT,
     THEMES,
     colors,
     get_theme,
@@ -15,18 +18,20 @@ from monitorator.tui.theme_colors import (
 )
 from monitorator.models import SessionStatus
 
+_ALL_THEMES = [DARK, LIGHT, BOKEH, HIGH_CONTRAST, SOLARIZED_DARK, SOLARIZED_LIGHT]
+
 
 class TestThemeColorsDataclass:
-    """All three theme instances have all required tokens."""
+    """All theme instances have all required tokens."""
 
-    @pytest.mark.parametrize("theme", [DARK, LIGHT, BOKEH])
+    @pytest.mark.parametrize("theme", _ALL_THEMES)
     def test_all_tokens_are_strings(self, theme: ThemeColors) -> None:
         import dataclasses
         for f in dataclasses.fields(theme):
             value = getattr(theme, f.name)
             assert isinstance(value, str), f"{f.name} should be a str, got {type(value)}"
 
-    @pytest.mark.parametrize("theme", [DARK, LIGHT, BOKEH])
+    @pytest.mark.parametrize("theme", _ALL_THEMES)
     def test_all_tokens_are_hex_colors(self, theme: ThemeColors) -> None:
         import dataclasses
         import re
@@ -45,6 +50,15 @@ class TestThemeColorsDataclass:
     def test_bokeh_bg_base(self) -> None:
         assert BOKEH.bg_base == "#1b2838"
 
+    def test_high_contrast_bg_base(self) -> None:
+        assert HIGH_CONTRAST.bg_base == "#000000"
+
+    def test_solarized_dark_bg_base(self) -> None:
+        assert SOLARIZED_DARK.bg_base == "#002b36"
+
+    def test_solarized_light_bg_base(self) -> None:
+        assert SOLARIZED_LIGHT.bg_base == "#fdf6e3"
+
 
 class TestThemeSwitching:
     def setup_method(self) -> None:
@@ -54,10 +68,9 @@ class TestThemeSwitching:
         assert get_theme() == "dark"
 
     def test_set_and_get_roundtrip(self) -> None:
-        set_theme("light")
-        assert get_theme() == "light"
-        set_theme("bokeh")
-        assert get_theme() == "bokeh"
+        for name in THEMES:
+            set_theme(name)
+            assert get_theme() == name
         set_theme("dark")
         assert get_theme() == "dark"
 
@@ -73,8 +86,11 @@ class TestThemeSwitching:
         with pytest.raises(ValueError):
             set_theme("neon")
 
-    def test_themes_dict_has_three_entries(self) -> None:
-        assert set(THEMES.keys()) == {"dark", "light", "bokeh"}
+    def test_themes_dict_has_six_entries(self) -> None:
+        assert set(THEMES.keys()) == {
+            "dark", "light", "bokeh",
+            "high-contrast", "solarized-dark", "solarized-light",
+        }
 
 
 class TestGetStatusColor:
@@ -97,13 +113,13 @@ class TestGetStatusColor:
         assert get_status_color(SessionStatus.SUBAGENT_RUNNING) == "#cc66ff"
 
     def test_terminated_color(self) -> None:
-        assert get_status_color(SessionStatus.TERMINATED) == "#444444"
+        assert get_status_color(SessionStatus.TERMINATED) == "#666666"
 
     def test_unknown_color(self) -> None:
-        assert get_status_color(SessionStatus.UNKNOWN) == "#444444"
+        assert get_status_color(SessionStatus.UNKNOWN) == "#666666"
 
     def test_colors_change_with_theme(self) -> None:
         set_theme("light")
-        assert get_status_color(SessionStatus.THINKING) == "#0a8f3a"
+        assert get_status_color(SessionStatus.THINKING) == "#07752f"
         set_theme("bokeh")
         assert get_status_color(SessionStatus.THINKING) == "#2ca02c"
