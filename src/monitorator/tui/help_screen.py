@@ -27,7 +27,7 @@ class HelpScreen(ModalScreen[None]):
             f"[{a}]r[/]       Refresh\n"
             f"[{a}]R[/]       Force Refresh (aggressive cleanup)\n"
             f"[{a}]o[/]       Open Terminal for session\n"
-            f"[{a}]t[/]       Cycle theme (dark/light/boke)\n"
+            f"[{a}]t[/]       Cycle theme\n"
             f"[{a}]T[/]       Theme picker\n"
             f"[{a}]j/k[/]     Navigate up/down\n"
             f"[{a}]Enter[/]   Select session (show details)\n"

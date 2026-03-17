@@ -10,9 +10,12 @@ from monitorator.tui.theme_colors import THEMES, colors
 
 
 _THEME_LABELS: dict[str, str] = {
-    "dark": "Dark        DexScreener-inspired, near-black background",
-    "light": "Light       White background, high contrast",
-    "bokeh": "Boke        Navy + blue + gold, data-viz inspired",
+    "dark": "Dark             Near-black, yellow accent",
+    "light": "Light            Warm white, amber accent",
+    "bokeh": "Bokeh            Navy + gold, data-viz",
+    "high-contrast": "High Contrast    Pure black, max readability",
+    "solarized-dark": "Solarized Dark   Teal + blue, terminal classic",
+    "solarized-light": "Solarized Light  Cream + blue, terminal classic",
 }
 
 
@@ -23,7 +26,10 @@ class ThemeScreen(ModalScreen[str | None]):
         Binding("escape", "cancel", "Cancel"),
         Binding("1", "pick_1", "Dark", show=False),
         Binding("2", "pick_2", "Light", show=False),
-        Binding("3", "pick_3", "Boke", show=False),
+        Binding("3", "pick_3", "Bokeh", show=False),
+        Binding("4", "pick_4", "High Contrast", show=False),
+        Binding("5", "pick_5", "Solarized Dark", show=False),
+        Binding("6", "pick_6", "Solarized Light", show=False),
     ]
 
     def __init__(self, current_theme: str) -> None:
@@ -43,7 +49,7 @@ class ThemeScreen(ModalScreen[str | None]):
                     line = f"[{colors.text_body}] {i}    {label}[/]"
                 yield Static(line, markup=True)
             yield Static(
-                f"[{colors.text_dimmer}]Press 1/2/3 to select \u2022 Esc to cancel[/]",
+                f"[{colors.text_dimmer}]Press 1-6 to select \u2022 Esc to cancel[/]",
                 markup=True,
             )
 
@@ -61,6 +67,15 @@ class ThemeScreen(ModalScreen[str | None]):
     def action_pick_3(self) -> None:
         self._pick(2)
 
+    def action_pick_4(self) -> None:
+        self._pick(3)
+
+    def action_pick_5(self) -> None:
+        self._pick(4)
+
+    def action_pick_6(self) -> None:
+        self._pick(5)
+
     def action_cancel(self) -> None:
         self.dismiss(None)
 
@@ -71,7 +86,7 @@ class ThemeScreen(ModalScreen[str | None]):
     #theme-dialog {
         width: 60;
         height: auto;
-        max-height: 12;
+        max-height: 15;
         background: $bg-raised;
         border: round $accent;
         padding: 1 2;
