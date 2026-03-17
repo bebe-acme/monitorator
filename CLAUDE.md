@@ -31,6 +31,9 @@ uv run monitorator uninstall --clean
 
 # Quick CLI status (no TUI)
 uv run monitorator status
+
+# Run with a specific theme
+uv run monitorator --theme solarized-dark
 ```
 
 ## Architecture
@@ -54,7 +57,9 @@ uv run monitorator status
 - **`detail_panel.py`** — Bottom panel showing expanded info for the selected session (status, PID, CPU, elapsed, branch, cwd, tool, prompt, subagent count). Uses box-drawing characters.
 - **`formatting.py`** — Status icons/colors/labels maps, `format_activity()` which transforms raw hook data into human-readable descriptions (tool-specific formatting for Bash/Edit/Write/Read/Grep/Glob/Task).
 - **`header_banner.py`** — Top banner with block logo, session counts (total/active/idle/waiting), timestamp.
-- **`styles.tcss`** — DexScreener-inspired dark theme. Near-black background (#0a0a0a), yellow accent (#ffcc00).
+- **`theme_colors.py`** — Six color themes (dark, light, bokeh, high-contrast, solarized-dark, solarized-light). All WCAG AA contrast-verified. `ThemeColors` dataclass with 30 semantic tokens, `_ActiveColors` proxy for runtime switching, `get_status_color()` helper.
+- **`theme_screen.py`** — Modal theme picker (keys 1-6). Shows current selection and descriptions.
+- **`styles.tcss`** — Theme-aware Textual CSS using `$variable` references that map to active theme colors.
 
 ### Supporting Modules
 
@@ -62,6 +67,7 @@ uv run monitorator status
 - **`project_metadata.py`** — Extracts project description from CLAUDE.md headings, pyproject.toml, package.json, or README.md. Cached per cwd.
 - **`terminal_opener.py`** — macOS-specific: finds TTY for a PID, activates the terminal app (tries Ghostty → iTerm2 → Terminal.app).
 - **`installer.py`** — Installs/uninstalls the `emit_event.py` hook into `~/.claude/settings.json` for all relevant event types (PreToolUse, PostToolUse, Notification, SubagentStart/Stop, Stop, UserPromptSubmit).
+- **`preferences.py`** — Persists user settings (theme choice) to `~/.monitorator/preferences.json`.
 
 ### Models (`models.py`)
 

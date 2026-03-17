@@ -13,7 +13,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776ab.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-ffcc00.svg?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-593%20passing-00ff66.svg?style=flat-square)](#development)
+[![Tests](https://img.shields.io/badge/tests-665%20passing-00ff66.svg?style=flat-square)](#development)
 [![Textual](https://img.shields.io/badge/TUI-Textual-cc66ff.svg?style=flat-square)](https://textual.textualize.io/)
 
 ![Monitorator Screenshot](assets/screenshot.png)
@@ -77,9 +77,25 @@ uv run monitorator
 | Command                            | Description                                  |
 | ---------------------------------- | -------------------------------------------- |
 | `monitorator` or `monitorator run` | Launch the TUI dashboard                     |
+| `monitorator run --theme <name>`   | Launch with a specific theme                 |
 | `monitorator status`               | Quick CLI status (no TUI)                    |
 | `monitorator install`              | Install hooks into `~/.claude/settings.json` |
 | `monitorator uninstall --clean`    | Remove hooks and clean session data          |
+
+### Themes
+
+Six built-in themes, all WCAG AA contrast-verified:
+
+| Theme | Description |
+| ----- | ----------- |
+| `dark` | Near-black background, yellow accent (default) |
+| `light` | Warm white background, amber accent |
+| `bokeh` | Navy + gold, data-visualization inspired |
+| `high-contrast` | Pure black, white accent, maximum readability |
+| `solarized-dark` | Ethan Schoonover's classic, teal + blue |
+| `solarized-light` | Solarized light variant, cream + blue |
+
+Press `t` to cycle themes or `T` to open the theme picker. Your choice is persisted across sessions.
 
 ## How It Works
 
@@ -122,7 +138,9 @@ src/monitorator/
     ├── chat_dropdown.py# Inline conversation history
     ├── column_header.py# Column labels
     ├── formatting.py   # Status icons, colors, activity text
-    └── styles.tcss     # DexScreener-inspired dark theme
+    ├── theme_colors.py # 6 color themes with WCAG AA contrast
+    ├── theme_screen.py # Theme picker modal
+    └── styles.tcss     # Theme-aware CSS variables
 ```
 
 ## Development
